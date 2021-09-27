@@ -1,2 +1,2 @@
-# MATH-517-Statistical-Computation-and-Visualization
+# MATH-517
 Group repository for MATH-517
