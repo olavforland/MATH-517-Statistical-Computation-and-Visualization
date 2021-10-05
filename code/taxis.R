@@ -18,11 +18,12 @@ sample <- taxi_trips %>%
 df1 <- sample %>%
   mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
   select(pickup_community_area, trip_total) %>%
-  mutate(across(where(is.numeric), scale)) %>% #standardize
+  mutate(trip_total, scale) %>% #standardize c("y", "z"), ~(scale(.) %>% as.vector)
   group_by(pickup_community_area) %>%
   arrange(pickup_community_area) %>%
   summarise(total = sum(trip_total, na.rm=T)) %>%
   #hist(df1$pickup_community_area, df1$total) 
   print()
-  
+
+?mutate_at  
 
