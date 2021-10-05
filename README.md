@@ -1,18 +1,3 @@
 version https://git-lfs.github.com/spec/v1
-oid sha256:8d26db96ef1f4d3e785b7a461c0c6670ac4a53ed49bfa7fab2d0dc6d9129c64f
-size 8
-
-Suggestions:
-
-- Taxis in chicago
-    - Heatmaps, interactive by time of day
-    
-Questions:
--Which areas generates most revenue at what parts of the day?
--What factors make some taxis more profitable than others?
-    
-    
-    
-For later:
-- Glaciers in switzerland:
-    - Could maybe model the melting
+oid sha256:422284ae2be86187963e70101ae4f1ab1d85ce37d2ae56f9f0c35a856525c120
+size 672
