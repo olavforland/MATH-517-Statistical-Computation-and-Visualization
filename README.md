@@ -6,5 +6,13 @@ Suggestions:
 
 - Taxis in chicago
     - Heatmaps, interactive by time of day
+    
+Questions:
+-Which areas generates most revenue at what parts of the day?
+-What factors make some taxis more profitable than others?
+    
+    
+    
+For later:
 - Glaciers in switzerland:
     - Could maybe model the melting
