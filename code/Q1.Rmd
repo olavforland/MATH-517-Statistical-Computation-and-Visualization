@@ -1,8 +1,10 @@
 ---
-title: "10-5-temp"
+title: "Q1 Attempt"
 author: "yiren"
 date: "05/10/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -10,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(data.table)
 library(dplyr)
+library(readr)
 
 ```
 
@@ -35,18 +38,18 @@ taxi_trips <- import("data/taxi_trips.csv") %>%
 sample <- taxi_trips %>% 
   sample_n(10000) 
 
-
-df1 <- sample %>%
-  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
-  select(pickup_community_area, trip_total) %>%
-  mutate(trip_total, scale) %>% #standardize c("y", "z"), ~(scale(.) %>% as.vector)
-  group_by(pickup_community_area) %>%
-  arrange(pickup_community_area) %>%
-  summarise(total = sum(trip_total, na.rm=T)) %>%
-  #hist(df1$pickup_community_area, df1$total) 
-  print()
-
-?mutate_at  
+# 
+# df1 <- sample %>%
+#   mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+#   select(pickup_community_area, trip_total) %>%
+#   mutate(trip_total, scale) %>% #standardize c("y", "z"), ~(scale(.) %>% as.vector)
+#   group_by(pickup_community_area) %>%
+#   arrange(pickup_community_area) %>%
+#   summarise(total = sum(trip_total, na.rm=T)) %>%
+#   #hist(df1$pickup_community_area, df1$total) 
+#   print()
+# 
+# ?mutate_at  
 
 # min(df1[1], na.rm = T) # 1
 # 
@@ -98,7 +101,7 @@ comm_area_1 = comm_area %>%
   
 ```
 
-Join the two dataframe by the community code
+Join the two dataframes by the community code
 ```{r}
 revenue_area = merge(mytrip, comm_area_1)
 revenue_area %>% mutate(standard_rev = total/`Area(km2)`) %>% arrange(desc(standard_rev))
