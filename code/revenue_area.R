@@ -58,23 +58,3 @@ corrr::correlate(mean_count, method = "pearson")
 #No correlation detected
 
 
-#How are the trips distributed over the day?
-
-sample %>%
-  group_by(pickup_community_area, dropoff_community_area) %>%
-  summarise(total = sum(trip_total)) %>%
-  mutate(total=as.factor(total)) %>%
-    ggplot() +
-    geom_point(mapping=aes(x=pickup_community_area, y=dropoff_community_area, size=total))
-
-df1 %>%
-  ggplot() +
-  geom_histogram(mapping=aes(x=pickup_community_area), binwidth=1)
-
-monthly_trips <- taxi_trips %>%
-  select(trip_start_timestamp) %>%
-  mutate(trip_start_timestamp = lubridate::mdy_hms(trip_start_timestamp)) %>%
-  group_by(month = lubridate::month(trip_start_timestamp), hour = lubridate::hour(trip_start_timestamp)) %>%
-  mutate(count = n()) %>%
-  print()
-
