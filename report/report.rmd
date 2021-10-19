@@ -1,0 +1,75 @@
+---
+title: "report"
+author: "yiren"
+date: "19/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## import the library
+
+```{r}
+
+```
+
+
+## Data Cleaning
+```{r}
+
+```
+
+
+## Question 1
+A clear statement of the goal of the mini-project (in short sentence(s) and most preferably in the form of (a) question(s) you intend to answer).
+
+```{r}
+
+```
+
+## Question 2
+A brief summary of the approach you have followed to achieve your goal. 
+
+```{r}
+
+```
+
+## Question 3
+A brief introduction to the problem (what has been done before in this context, why is the problem you are tackling relevant, etc...).
+
+```{r}
+
+```
+
+
+## Question 4
+Comprehensive descriptive analysis of the data (which variables you have available, are they continuous, discrete?, etc...).
+
+
+```{r}
+
+```
+
+## Question 5
+
+Comprehensive presentation of results (which statistical models/techniques have you used -if any- and why they were adequate to tackle your problem with the data you had).
+
+```{r}
+
+
+```
+
+
+## Question 6
+Conclusions and discussion.
+
+
+## Question 7
+Possible future work.
+
+
+
+
+

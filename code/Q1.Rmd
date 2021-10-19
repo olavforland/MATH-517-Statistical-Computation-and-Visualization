@@ -1,0 +1,345 @@
+---
+title: "SCV Analysis"
+author: "yiren"
+date: "19/10/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(readr)
+library(qqplotr)
+library(GGally) 
+library(leaflet)
+library(lubridate) # dealing with time
+library(nycflights13)
+
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)    # for static and interactive maps
+library(osmdata)
+library(ggmap)
+
+```
+
+
+## Previous
+```{r}
+mytable <- read_csv("data/taxi_trips_2020.csv")
+```
+
+```{r}
+pacman::p_load(pacman, party, psych, rio, tidyverse, plotly, rjson, corrr) 
+p_load(janitor)
+taxi_trips = mytable %>% clean_names() %>%
+  print()
+
+```
+
+```{r}
+set.seed(5)
+sample <- taxi_trips %>%
+  sample_n(10000)
+```
+
+```{r}
+
+```
+
+## explore the relationship among continuous variables
+
+
+```{r}
+summary(sample)
+sample_gally <- taxi_trips %>%
+  sample_n(10000)
+
+sample_gally <- sample_gally %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
+GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
+```
+
+As expected, trip miles and trip total have strong positive correlation.
+While looking at the histogram of the continous variables, we can spot the pattern that most of the distribution have heavy tails, hence we do the logrithmic transformation.
+
+```{r}
+ggplot(sample_gally, aes(x = trip_total)) +
+  geom_histogram(binwidth = 5) +  scale_y_continuous(trans='log2') + xlim(0, 200)
+```
+
+From the plot, it seems like that trip_total.. to be continue
+
+## Analysis
+```{r}
+par(cex = 0.3) 
+sample %>% 
+  ggplot(mapping = aes(sample = trip_total)) +
+    stat_qq_band() +
+    stat_qq_line() +
+    stat_qq_point() +
+    labs(x = "Theoretical Quantiles", y = "Sample Quantiles") + 
+    theme_classic() + theme(aspect.ratio=1) +
+    theme(text = element_text(size=6)) + 
+  scale_y_continuous(limits = c(0, 400)) # use scale y to ignore the extreme outliners.
+```
+
+
+```{r}
+# library(ggfortify) 
+# lm1 = lm(lozone ~ temperature, data = environmental)
+# autoplot(lm1, which = 1:2)
+```
+
+
+
+## explore other maps
+
+```{r}
+q1 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "cinema") 
+
+q2 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "restaurant")
+  # add_osm_feature(key = 'route', value = 'train')
+str(q1) #query structure
+q_all = c (osmdata_sf (q1), osmdata_sf (q2))
+# spots <- osmdata_sf(q_all)
+# bus
+```
+
+
+
+```{r}
+# plots all spots
+mad_map <- get_map(getbb("Chicago"), maptype = "toner-background")
+  ggmap(mad_map)+
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE)+ 
+  labs(x = "", y = "") 
+```
+
+```{r}
+get_map(getbb("Chicago"), maptype = "toner-background")
+  ggmap(mad_map)+
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE, colour = "red",size = 0.5, alpha = .3)+
+  labs(x = "", y = "") 
+```
+
+
+
+```{r cars}
+# #loading useful packages
+# pacman::p_load(pacman, party, psych, rio, tidyverse) 
+# p_load(janitor)
+# 
+# taxi_trips <- import("data/taxi_trips.csv") %>%
+#   as_tibble() %>%
+#   clean_names() %>% #from janitor package to remove space from names
+#   print()
+# 
+# 
+
+
+# 
+# df1 <- sample %>%
+#   mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+#   select(pickup_community_area, trip_total) %>%
+#   mutate(trip_total, scale) %>% #standardize c("y", "z"), ~(scale(.) %>% as.vector)
+#   group_by(pickup_community_area) %>%
+#   arrange(pickup_community_area) %>%
+#   summarise(total = sum(trip_total, na.rm=T)) %>%
+#   #hist(df1$pickup_community_area, df1$total) 
+#   print()
+# 
+# ?mutate_at  
+
+# min(df1[1], na.rm = T) # 1
+# 
+# max(df1[1], na.rm = T) # 77 
+```
+
+# Variables we use are pickup_community_area, dropoff_community_area, trip_total
+
+
+## Loading from main
+```{r}
+#I want to start with exploring the relationships between pickup and dropoff locations in terms of revenue
+df1 <- taxi_trips %>%
+  select(pickup_community_area, dropoff_community_area, trip_total) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area),
+         dropoff_community_area = as.numeric(dropoff_community_area),
+         trip_total=as.numeric(trip_total))
+
+#Extracting a random sample so plotting is done more quickly
+sample <- df1 %>%
+  sample_n(10000)
+
+#initial distribution of amount of taxitips -> almost all trips start from the same areas
+sample %>%
+  ggplot() +
+  geom_bar(mapping=aes(x=pickup_community_area)) #set fill to company to see bigest acteurs
+  
+#Question: which areas?
+trips_region <- sample %>%
+  group_by(pickup_community_area) %>%
+  summarize(count=n()) %>%
+  drop_na() 
+
+trips_region %>%
+  top_n(n=20, count) %>%
+  ggplot(mapping=aes(x=reorder(pickup_community_area, -count), y=count)) +
+  geom_bar(stat="identity")
+
+#How does this translate into revenue? (per trip)
+
+mean_trip_region <- sample %>%
+  group_by(pickup_community_area) %>%
+  drop_na() %>%
+  summarize(mean=mean(trip_total)) 
+
+mean_trip_region %>%
+  top_n(n=20, mean) %>%
+  ggplot(mapping=aes(x=reorder(pickup_community_area, -mean), y=mean)) +
+  geom_col() 
+  
+#Not very informative -> How is the correlation between activity in an area and revenue per trip?
+
+mean_count <- inner_join(trips_region, mean_trip_region)
+mean_count %>%
+  select(count, mean) %>%
+  corrr::correlate(method="pearson")
+
+corrr::corxrelate(mean_count, method = "pearson")
+
+#No correlation detected
+```
+
+## Loading from taxi.R
+```{r}
+#How are the trips distributed over the day?
+# sample <- df1 %>%
+#   sample_n(10000)
+# 
+# sample %>%
+#   group_by(pickup_community_area, dropoff_community_area) %>%
+#   summarise(total = sum(trip_total)) %>%
+#   mutate(total=as.factor(total)) %>%
+#     ggplot() +
+#     geom_point(mapping=aes(x=pickup_community_area, y=dropoff_community_area, size=total))
+
+df1 %>%
+  ggplot() +
+  geom_histogram(mapping=aes(x=pickup_community_area), binwidth=1)
+
+monthly_trips <- taxi_trips %>%
+  select(trip_start_timestamp) %>%
+  mutate(trip_start_timestamp = lubridate::mdy_hms(trip_start_timestamp)) %>%
+  group_by(month = lubridate::month(trip_start_timestamp), hour = lubridate::hour(trip_start_timestamp)) %>%
+  mutate(count = n()) %>%
+  print()
+```
+
+## Copied from haakonmd (not running yet)
+```{r}
+library(tidyverse)
+library(ggmap)
+# taxi_trips<-read_csv("./data/Taxi_Trips_2020.csv")
+
+taxi_trips <- mytable
+# Insert of private API key below
+register_google(key="###############################")
+
+# Geocode of Chicago
+chicago <- geocode("Chicago, IL")
+
+#Displaying pick up Location
+pick_up <- tibble(lat=sample$`Pickup Centroid Latitude`, lon=sample$`Pickup Centroid Longitude`)
+
+ggmap(get_map(chicago, zoom=11, maptype="toner-lite"))+
+  ggtitle("Pick up locations for a sample of 10 000 taxi trips")+
+  geom_point(mapping=aes(x=lon, y=lat), color="black", data=pick_up, alpha=0.05)+
+  theme(axis.ticks=element_blank(), axis.text=element_blank(), axis.title=element_blank()) +
+  theme(panel.background=element_blank())
+
+
+#Displaying drop off Location
+drop_off <- tibble(lat=sample$`Dropoff Centroid Latitude`, lon=sample$`Dropoff Centroid Longitude`)
+
+ggmap(get_map(chicago, zoom=11, maptype="toner-lite"))+
+  ggtitle("Drop off locations for a sample of 10 000 taxi trips")+
+  geom_point(mapping=aes(x=lon, y=lat), color="black", data=drop_off, alpha=0.05)+
+  theme(axis.ticks=element_blank(), axis.text=element_blank(), axis.title=element_blank()) +
+  theme(panel.background=element_blank())
+```
+
+
+
+
+## Dataset
+
+```{r}
+head(sample)
+```
+
+
+You can also embed plots, for example:
+### 1. Direct Calc w/o Standardization
+
+```{r pressure, echo=FALSE}
+sample %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  select(pickup_community_area, trip_total) 
+
+
+mytrip = taxi_trips %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  select(pickup_community_area, trip_total) %>% 
+  group_by(pickup_community_area) %>%
+  summarise(total = sum(trip_total, na.rm=T)) %>%
+  # arrange(desc(total)) %>%
+  rename(comm = pickup_community_area) %>% drop_na()
+
+
+```
+It shows community 76 is the one getting most revenue, however, when we look at the area data, community 76 O'Hare is obviously the largest community in Chicago.
+
+### 2. Considering Area
+Area data
+https://en.wikipedia.org/wiki/Community_areas_in_Chicago#cite_note-CMAP_Area-10
+
+Geospatial Data
+https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Community-Areas-current-/cauq-8yn6
+
+Data Cleaning 
+```{r}
+comm_area = read_csv("data/mywiki.csv")
+comm_area_1 = comm_area %>% 
+  select(No., `Area(km2)`) %>% 
+  rename(comm = No.) %>%
+  mutate(comm = as.numeric(comm))
+  
+```
+
+Join the two dataframes by the community code
+```{r}
+revenue_area = merge(mytrip, comm_area_1)
+revenue_area %>% mutate(standard_rev = total/`Area(km2)`) %>% arrange(desc(standard_rev))
+```
+just look at data
+```{r}
+comm_area %>% arrange(desc(`Density(km2)`))
+comm_area %>% arrange(desc(Population))
+```
+
+
+
+
+
