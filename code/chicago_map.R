@@ -43,13 +43,25 @@ areas <- st_read("data/chicago_community_areas/chicago_community_areas.shp", as_
   print()
 
 #Trying to color each area by trip_total
-pal <- colorNumeric("YlOrRd", domain = areas$trip_total)
-print(pal)
+pal <- colorNumeric("Blues", domain = areas$trip_total)
 
+
+#Make the map
 chicago_leaflet %>%
-  addPolygons(data=areas$geometry, 
+  addPolygons(data=areas,
+              fillColor=~pal(areas$trip_total),
+              color="grey",
               weight=2, 
-              fillColor=pal(areas$geometry))
+              highlightOptions = highlightOptions(
+                weight=5,
+                color="#666",
+                bringToFront=TRUE)) %>%
+              
+  addLegend("bottomright",
+            pal = pal,
+            values = areas$trip_total,
+            title = "Trip total",
+            opacity = 1)
 
 
 class(areas$geometry)
