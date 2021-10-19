@@ -1,7 +1,7 @@
 ---
-title: "Q1 Attempt"
+title: "SCV Analysis"
 author: "yiren"
-date: "05/10/2021"
+date: "19/10/2021"
 output:
   pdf_document: default
   html_document: default
@@ -13,30 +13,66 @@ library(ggplot2)
 library(data.table)
 library(dplyr)
 library(readr)
+library(qqplotr)
 
 ```
 
 
 ## Previous
 ```{r}
-mytable <- read_csv("data/taxi_trips.csv")
+mytable <- read_csv("data/taxi_trips_2020.csv")
+```
+
+```{r}
+pacman::p_load(pacman, party, psych, rio, tidyverse, plotly, rjson, corrr) 
+p_load(janitor)
+taxi_trips = mytable %>% clean_names() %>%
+  print()
+
+```
+
+```{r}
+sample <- taxi_trips %>%
+  sample_n(10000)
 ```
 
 
+## Analysis
+```{r}
+par(cex = 0.3) 
+sample %>% 
+  ggplot(mapping = aes(sample = trip_total)) +
+    stat_qq_band() +
+    stat_qq_line() +
+    stat_qq_point() +
+    labs(x = "Theoretical Quantiles", y = "Sample Quantiles") + 
+    theme_classic() + theme(aspect.ratio=1) +
+    theme(text = element_text(size=6))
+```
+
+
+```{r}
+library(ggfortify) 
+lm1 = lm(lozone ~ temperature, data = environmental)
+autoplot(lm1, which = 1:2)
+```
+
+
+
+
+
 ```{r cars}
-#loading useful packages
-pacman::p_load(pacman, party, psych, rio, tidyverse) 
-p_load(janitor)
+# #loading useful packages
+# pacman::p_load(pacman, party, psych, rio, tidyverse) 
+# p_load(janitor)
+# 
+# taxi_trips <- import("data/taxi_trips.csv") %>%
+#   as_tibble() %>%
+#   clean_names() %>% #from janitor package to remove space from names
+#   print()
+# 
+# 
 
-taxi_trips <- import("data/taxi_trips.csv") %>%
-  as_tibble() %>%
-  clean_names() %>% #from janitor package to remove space from names
-  print()
-
-
-#Extracting random sample
-sample <- taxi_trips %>% 
-  sample_n(10000) 
 
 # 
 # df1 <- sample %>%
@@ -55,6 +91,123 @@ sample <- taxi_trips %>%
 # 
 # max(df1[1], na.rm = T) # 77 
 ```
+
+# Variables we use are pickup_community_area, dropoff_community_area, trip_total
+
+
+## Loading from main
+```{r}
+#I want to start with exploring the relationships between pickup and dropoff locations in terms of revenue
+df1 <- taxi_trips %>%
+  select(pickup_community_area, dropoff_community_area, trip_total) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area),
+         dropoff_community_area = as.numeric(dropoff_community_area),
+         trip_total=as.numeric(trip_total))
+
+#Extracting a random sample so plotting is done more quickly
+sample <- df1 %>%
+  sample_n(10000)
+
+#initial distribution of amount of taxitips -> almost all trips start from the same areas
+sample %>%
+  ggplot() +
+  geom_bar(mapping=aes(x=pickup_community_area)) #set fill to company to see bigest acteurs
+  
+#Question: which areas?
+trips_region <- sample %>%
+  group_by(pickup_community_area) %>%
+  summarize(count=n()) %>%
+  drop_na() 
+
+trips_region %>%
+  top_n(n=20, count) %>%
+  ggplot(mapping=aes(x=reorder(pickup_community_area, -count), y=count)) +
+  geom_bar(stat="identity")
+
+#How does this translate into revenue? (per trip)
+
+mean_trip_region <- sample %>%
+  group_by(pickup_community_area) %>%
+  drop_na() %>%
+  summarize(mean=mean(trip_total)) 
+
+mean_trip_region %>%
+  top_n(n=20, mean) %>%
+  ggplot(mapping=aes(x=reorder(pickup_community_area, -mean), y=mean)) +
+  geom_col() 
+  
+#Not very informative -> How is the correlation between activity in an area and revenue per trip?
+
+mean_count <- inner_join(trips_region, mean_trip_region)
+mean_count %>%
+  select(count, mean) %>%
+  corrr::correlate(method="pearson")
+
+corrr::corxrelate(mean_count, method = "pearson")
+
+#No correlation detected
+```
+
+## Loading from taxi.R
+```{r}
+#How are the trips distributed over the day?
+# sample <- df1 %>%
+#   sample_n(10000)
+# 
+# sample %>%
+#   group_by(pickup_community_area, dropoff_community_area) %>%
+#   summarise(total = sum(trip_total)) %>%
+#   mutate(total=as.factor(total)) %>%
+#     ggplot() +
+#     geom_point(mapping=aes(x=pickup_community_area, y=dropoff_community_area, size=total))
+
+df1 %>%
+  ggplot() +
+  geom_histogram(mapping=aes(x=pickup_community_area), binwidth=1)
+
+monthly_trips <- taxi_trips %>%
+  select(trip_start_timestamp) %>%
+  mutate(trip_start_timestamp = lubridate::mdy_hms(trip_start_timestamp)) %>%
+  group_by(month = lubridate::month(trip_start_timestamp), hour = lubridate::hour(trip_start_timestamp)) %>%
+  mutate(count = n()) %>%
+  print()
+```
+
+## Copied from haakonmd (not running yet)
+```{r}
+library(tidyverse)
+library(ggmap)
+# taxi_trips<-read_csv("./data/Taxi_Trips_2020.csv")
+
+taxi_trips <- mytable
+# Insert of private API key below
+register_google(key="###############################")
+
+# Geocode of Chicago
+chicago <- geocode("Chicago, IL")
+
+#Displaying pick up Location
+pick_up <- tibble(lat=sample$`Pickup Centroid Latitude`, lon=sample$`Pickup Centroid Longitude`)
+
+ggmap(get_map(chicago, zoom=11, maptype="toner-lite"))+
+  ggtitle("Pick up locations for a sample of 10 000 taxi trips")+
+  geom_point(mapping=aes(x=lon, y=lat), color="black", data=pick_up, alpha=0.05)+
+  theme(axis.ticks=element_blank(), axis.text=element_blank(), axis.title=element_blank()) +
+  theme(panel.background=element_blank())
+
+
+#Displaying drop off Location
+drop_off <- tibble(lat=sample$`Dropoff Centroid Latitude`, lon=sample$`Dropoff Centroid Longitude`)
+
+ggmap(get_map(chicago, zoom=11, maptype="toner-lite"))+
+  ggtitle("Drop off locations for a sample of 10 000 taxi trips")+
+  geom_point(mapping=aes(x=lon, y=lat), color="black", data=drop_off, alpha=0.05)+
+  theme(axis.ticks=element_blank(), axis.text=element_blank(), axis.title=element_blank()) +
+  theme(panel.background=element_blank())
+```
+
+
+
 
 ## Dataset
 
