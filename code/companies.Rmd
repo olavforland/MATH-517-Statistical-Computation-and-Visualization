@@ -3,33 +3,14 @@ title: "exploratory_taxis"
 author: "tho"
 date: "10/4/2021"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
 ```{r library, echo=FALSE}
 library(data.table)
@@ -38,6 +19,7 @@ library(tidyr)
 library(ggplot2)
 library(qqplotr)
 library(gridExtra)
+library(lubridate)
 ```
 
 ```{r loading data, echo=FALSE}
@@ -554,7 +536,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$n)) +
+  geom_col(aes(x = reorder(dt$Company, dt$n), y = dt$n)) +
   labs(title = "Bar plot of number of trips against each Company",
        x = "Company", y = "Trips") +
   coord_flip() +
@@ -573,7 +555,7 @@ My_Theme = theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$n)) +
+  geom_col(aes(x = reorder(dt$Company, dt$n), y = dt$n)) +
   labs(title = "Bar plot of number of drivers against each Company",
        x = "Company", y = "Drivers") +
   coord_flip() +
@@ -596,7 +578,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$mean.Trip.Minutes)) +
+  geom_col(aes(x = reorder(dt$Company, dt$mean.Trip.Minutes), y = dt$mean.Trip.Minutes)) +
   labs(title = "Bar plot of mean of trips time against each Company",
        x = "Company", y = "mean(Trip.Minutes)") +
   coord_flip() +
@@ -617,7 +599,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$max.Trip.Minutes)) +
+  geom_col(aes(x = reorder(dt$Company, dt$max.Trip.Minutes), y = dt$max.Trip.Minutes)) +
   labs(title = "Bar plot of max time of a trip against each Company",
        x = "Company", y = "max(Trip.Minutes)") +
   coord_flip() +
@@ -638,7 +620,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$sum.Trip.Minutes)) +
+  geom_col(aes(x = reorder(dt$Company, dt$sum.Trip.Minutes), y = dt$sum.Trip.Minutes)) +
   labs(title = "Bar plot of sum of trip time against each Company",
        x = "Company", y = "sum(Trip.Minutes)") +
   coord_flip() +
@@ -660,7 +642,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$mean.Trip.Miles)) +
+  geom_col(aes(x = reorder(dt$Company, dt$mean.Trip.Miles), y = dt$mean.Trip.Miles)) +
   labs(title = "Bar plot of mean of trips miles against each Company",
        x = "Company", y = "mean(Trip.Miles)") +
   coord_flip() +
@@ -680,7 +662,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$max.Trip.Miles)) +
+  geom_col(aes(x = reorder(dt$Company, dt$max.Trip.Miles), y = dt$max.Trip.Miles)) +
   labs(title = "Bar plot of max miles of a trip against each Company",
        x = "Company", y = "max(Trip.Miles)") +
   coord_flip() +
@@ -700,7 +682,7 @@ My_Theme <- theme(
   title = element_text(size = 10))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$sum.Trip.Miles)) +
+  geom_col(aes(x = reorder(dt$Company, dt$sum.Trip.Miles), y = dt$sum.Trip.Miles)) +
   labs(title = "Bar plot of sum miles of trips against each Company",
        x = "Company", y = "sum(Trip.Miles)") +
   coord_flip() +
@@ -720,16 +702,746 @@ dt <- as.data.table(dt[,mean(Trip.Total / Trip.Seconds),by=Company])
 My_Theme <- theme(
   axis.title = element_text(size = 10),
   axis.text.y = element_text(size = 6),
-  title = element_text(size = 10))
+  title = element_text(size = 8))
 
 ggplot() +
-  geom_col(aes(x = dt$Company, y = dt$V1)) +
-  labs(title = "Bar plot of mean Trip.Total divided by Trip.Minutes against each Company",
+  geom_col(aes(x = reorder(dt$Company, dt$V1), y = dt$V1)) +
+  labs(title = "Bar plot of mean(Trip.Total) divided by Trip.Minutes against each Company",
        x = "Company", y = "mean") +
   coord_flip() +
   My_Theme
 
 rm(dt, My_Theme)
+
+```
+
+```{r Plots of Trip.Total against number of drivers for each company, echo=FALSE, warning=FALSE}
+## Plots of Trip.Total against number of drivers for each company
+
+dt <- as.data.table(data[,.(n_distinct(Taxi.ID),sum(Trip.Total),max(Trip.Total),
+                             mean(Trip.Total)),by = Company])
+setnames(dt,c("V1","V2","V3","V4"),
+         c("n","sum.Trip.Total","max.Trip.Total","mean.Trip.Total"))
+
+My_Theme <- theme(
+  axis.title = element_text(size = 10),
+  axis.text.y = element_text(size = 6),
+  title = element_text(size = 8),
+  legend.key.size = unit(0.2, "cm"),
+  legend.position = "left")
+
+
+ggplot() +
+  geom_point(aes(x = dt$sum.Trip.Total, y = dt$n, color=dt$Company)) +
+  My_Theme +
+  guides(col = guide_legend(ncol = 1,
+                            label.theme = element_text(size = 6),
+                            title = "Company")) +
+  labs(title = "Plot of sum(Trip.Total) against number of drivers for each company",
+       x = "sum(Trip.Total)", y = "Drivers")
+
+ggplot() +
+  geom_point(aes(x = dt$max.Trip.Total, y = dt$n, color=dt$Company)) +
+  My_Theme +
+  guides(col = guide_legend(ncol = 1,
+                            label.theme = element_text(size = 6),
+                            title = "Company")) +
+  labs(title = "Plot of max(Trip.Total) against number of drivers for each company",
+       x = "max(Trip.Total)", y = "Drivers")
+
+ggplot() +
+  geom_point(aes(x = dt$mean.Trip.Total, y = dt$n, color=dt$Company)) +
+  My_Theme +
+  guides(col = guide_legend(ncol = 1,
+                            label.theme = element_text(size = 6),
+                            title = "Company")) +
+  labs(title = "Plot of mean(Trip.Total) against number of drivers for each company",
+       x = "mean(Trip.Total)", y = "Drivers")
+```
+
+```{r Time series of Trip.Total per Company, echo=FALSE, warning=FALSE}
+data <- na.omit(data, cols = c("Trip.Start.Timestamp"))
+
+My_Theme <- theme(
+  axis.title = element_text(size = 8),
+  axis.text = element_text(size = 6),
+  title = element_text(size = 8))
+
+dt1 <- as.data.table(data[Company=="Top Cab Affiliation"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Top Cab Affiliation",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Blue Ribbon Taxi Association Inc."])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Blue Ribbon Taxi Association Inc.",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Taxi Affiliation Services"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Taxi Affiliation Services",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Sun Taxi"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Sun Taxi",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="Medallion Leasin"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Medallion Leasin",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="City Service"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for City Service",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Chicago Independents"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Chicago Independents",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Chicago Carriage Cab Corp"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Chicago Carriage Cab Corp",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="Star North Management LLC"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Star North Management LLC",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Flash Cab"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Flash Cab",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Petani Cab Corp"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Petani Cab Corp",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Taxicab Insurance Agency, LLC"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Taxicab Insurance Agency, LLC",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="Choice Taxi Association"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Choice Taxi Association",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Patriot Taxi Dba Peace Taxi Associat"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Patriot Taxi Dba Peace Taxi Associat",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Chicago Medallion Management"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Chicago Medallion Management",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="24 Seven Taxi"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 24 Seven Taxi",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="KOAM Taxi Association"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for KOAM Taxi Association",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="312 Medallion Management Corp"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 312 Medallion Management Corp",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Suburban Dispatch LLC"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Suburban Dispatch LLC",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Chicago Taxicab"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Chicago Taxicab",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="Nova Taxi Affiliation Llc"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Nova Taxi Affiliation Llc",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Taxi Affiliation Service Yellow"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Taxi Affiliation Service Yellow",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Blue Diamond"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Blue Diamond",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Setare Inc"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Setare Inc",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="6743 - 78771 Luhak Corp"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 6743 - 78771 Luhak Corp",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Metro Jet Taxi A"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Metro Jet Taxi A",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Leonard Cab Co"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Leonard Cab Co",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="5062 - 34841 Sam Mestas"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 5062 - 34841 Sam Mestas",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="4053 - 40193 Adwar H. Nikola"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 4053 - 40193 Adwar H. Nikola",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="3011 - 66308 JBL Cab Inc."])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3011 - 66308 JBL Cab Inc.",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="U Taxicab"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for U Taxicab",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="3094 - 24059 G.L.B. Cab Co"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3094 - 24059 G.L.B. Cab Co",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="5 Star Taxi"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 5 Star Taxi",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="2092 - 61288 Sbeih company"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 2092 - 61288 Sbeih company",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="3556 - 36214 RC Andrews Cab"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3556 - 36214 RC Andrews Cab",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="6742 - 83735 Tasha ride inc"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 6742 - 83735 Tasha ride inc",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="1085 - 72312 N and W Cab Co"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 1085 - 72312 N and W Cab Co",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="2733 - 74600 Benny Jona"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 2733 - 74600 Benny Jona",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="5874 - 73628 Sergey Cab Corp."])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 5874 - 73628 Sergey Cab Corp.",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="3620 - 52292 David K. Cab Corp."])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3620 - 52292 David K. Cab Corp.",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="4787 - 56058 Reny Cab Co"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 4787 - 56058 Reny Cab Co",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="Checker Taxi Affiliation"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Checker Taxi Affiliation",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="5006 - 39261 Salifu Bawa"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 5006 - 39261 Salifu Bawa",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="4623 - 27290 Jay Kim"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 4623 - 27290 Jay Kim",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="6574 - Babylon Express Inc."])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 6574 - Babylon Express Inc.",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="3623 - 72222 Arrington Enterprises"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3623 - 72222 Arrington Enterprises",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="3721 - Santamaria Express, Alvaro Santamaria"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3721 - Santamaria Express, Alvaro Santamaria",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="3591 - 63480 Chuks Cab"])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 3591 - 63480 Chuks Cab",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
+
+dt1 <- as.data.table(data[Company=="4523 - 79481 Hazel Transit Inc"])
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt1$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt1 <- cbind(dt1,dates)
+dt1 <- as.data.table(dt1[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot1 <- ggplot(data = dt1, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for 4523 - 79481 Hazel Transit Inc",
+       x = "Date") +
+  My_Theme
+
+dt2 <- as.data.table(data[Company=="CMT-Sales"])
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt2$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt2 <- cbind(dt2,dates)
+dt2 <- as.data.table(dt2[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot2 <- ggplot(data = dt2, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for CMT-Sales",
+       x = "Date") +
+  My_Theme
+
+dt3 <- as.data.table(data[Company=="Globe Taxi"])
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt3$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt3 <- cbind(dt3,dates)
+dt3 <- as.data.table(dt3[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot3 <- ggplot(data = dt3, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Globe Taxi",
+       x = "Date") +
+  My_Theme
+
+dt4 <- as.data.table(data[Company=="Metro Jet Cab Association Inc."])
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = Trip.Start.Timestamp])
+dates <- as.Date.character(dt4$Trip.Start.Timestamp,format = "%m/%d/%Y")
+dt4 <- cbind(dt4,dates)
+dt4 <- as.data.table(dt4[,.(Trip.Total = sum(Trip.Total)),by = dates])
+
+plot4 <- ggplot(data = dt4, aes(x=dates,y=Trip.Total,group = 1)) +
+  geom_line()  +
+  labs(title = "Time serie of Trip.Total for Metro Jet Cab Association Inc.",
+       x = "Date") +
+  My_Theme
+
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+rm(dt1,dt2,dt3,dt4)
+rm(plot1,plot2,plot3,plot4)
 
 ```
 
