@@ -14,6 +14,19 @@ library(data.table)
 library(dplyr)
 library(readr)
 library(qqplotr)
+library(GGally) 
+library(leaflet)
+library(lubridate) # dealing with time
+library(nycflights13)
+
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)    # for static and interactive maps
+library(osmdata)
+library(ggmap)
 
 ```
 
@@ -32,10 +45,36 @@ taxi_trips = mytable %>% clean_names() %>%
 ```
 
 ```{r}
+set.seed(5)
 sample <- taxi_trips %>%
   sample_n(10000)
 ```
 
+```{r}
+
+```
+
+## explore the relationship among continuous variables
+
+
+```{r}
+summary(sample)
+sample_gally <- taxi_trips %>%
+  sample_n(10000)
+
+sample_gally <- sample_gally %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
+GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
+```
+
+As expected, trip miles and trip total have strong positive correlation.
+While looking at the histogram of the continous variables, we can spot the pattern that most of the distribution have heavy tails, hence we do the logrithmic transformation.
+
+```{r}
+ggplot(sample_gally, aes(x = trip_total)) +
+  geom_histogram(binwidth = 5) +  scale_y_continuous(trans='log2') + xlim(0, 200)
+```
+
+From the plot, it seems like that trip_total.. to be continue
 
 ## Analysis
 ```{r}
@@ -47,17 +86,52 @@ sample %>%
     stat_qq_point() +
     labs(x = "Theoretical Quantiles", y = "Sample Quantiles") + 
     theme_classic() + theme(aspect.ratio=1) +
-    theme(text = element_text(size=6))
+    theme(text = element_text(size=6)) + 
+  scale_y_continuous(limits = c(0, 400)) # use scale y to ignore the extreme outliners.
 ```
 
 
 ```{r}
-library(ggfortify) 
-lm1 = lm(lozone ~ temperature, data = environmental)
-autoplot(lm1, which = 1:2)
+# library(ggfortify) 
+# lm1 = lm(lozone ~ temperature, data = environmental)
+# autoplot(lm1, which = 1:2)
 ```
 
 
+
+## explore other maps
+
+```{r}
+q1 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "cinema") 
+
+q2 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "restaurant")
+  # add_osm_feature(key = 'route', value = 'train')
+str(q1) #query structure
+q_all = c (osmdata_sf (q1), osmdata_sf (q2))
+# spots <- osmdata_sf(q_all)
+# bus
+```
+
+
+
+```{r}
+# plots all spots
+mad_map <- get_map(getbb("Chicago"), maptype = "toner-background")
+  ggmap(mad_map)+
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE)+ 
+  labs(x = "", y = "") 
+```
+
+```{r}
+get_map(getbb("Chicago"), maptype = "toner-background")
+  ggmap(mad_map)+
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE, colour = "red",size = 0.5, alpha = .3)+
+  labs(x = "", y = "") 
+```
 
 
 
