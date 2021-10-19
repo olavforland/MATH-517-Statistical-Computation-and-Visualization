@@ -31,3 +31,11 @@ ggmap(get_map(chicago, zoom=11, maptype="toner-lite"))+
   theme(axis.ticks=element_blank(), axis.text=element_blank(), axis.title=element_blank()) +
   theme(panel.background=element_blank())
 
+# Geocode of Chicago
+chicago <- geocode("Spain")
+
+ggmap(get_map(chicago, zoom=9, maptype="hybrid"))+
+  ggtitle("Drop off locations for a sample of 10 000 taxi trips")
+  
+  
+

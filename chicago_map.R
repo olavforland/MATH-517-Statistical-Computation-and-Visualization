@@ -81,7 +81,6 @@ chicago_leaflet %>%
             labFormat = leaflet::labelFormat(
               transform = function(x) 10^(x)))
 
-#TODO: Scale has to be fixed
 
 
 
