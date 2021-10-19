@@ -7,28 +7,109 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Previous
+```{r}
+mytable <- read_csv("data/taxi_trips.csv")
+```
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-summary(cars)
+#loading useful packages
+pacman::p_load(pacman, party, psych, rio, tidyverse) 
+p_load(janitor)
 
-library(MASS)
-library(ggplot2)
+taxi_trips <- import("data/taxi_trips.csv") %>%
+  as_tibble() %>%
+  clean_names() %>% #from janitor package to remove space from names
+  print()
 
+
+#Extracting random sample
+sample <- taxi_trips %>% 
+  sample_n(10000) 
+
+
+df1 <- sample %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  select(pickup_community_area, trip_total) %>%
+  mutate(trip_total, scale) %>% #standardize c("y", "z"), ~(scale(.) %>% as.vector)
+  group_by(pickup_community_area) %>%
+  arrange(pickup_community_area) %>%
+  summarise(total = sum(trip_total, na.rm=T)) %>%
+  #hist(df1$pickup_community_area, df1$total) 
+  print()
+
+?mutate_at  
+
+# min(df1[1], na.rm = T) # 1
+# 
+# max(df1[1], na.rm = T) # 77 
 ```
 
-## Including Plots
+## Dataset
+
+```{r}
+head(sample)
+```
+
 
 You can also embed plots, for example:
+### 1. Direct Calc w/o Standardization
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+sample %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  select(pickup_community_area, trip_total) 
+
+
+mytrip = taxi_trips %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  select(pickup_community_area, trip_total) %>% 
+  group_by(pickup_community_area) %>%
+  summarise(total = sum(trip_total, na.rm=T)) %>%
+  # arrange(desc(total)) %>%
+  rename(comm = pickup_community_area) %>% drop_na()
+
+
+```
+It shows community 76 is the one getting most revenue, however, when we look at the area data, community 76 O'Hare is obviously the largest community in Chicago.
+
+### 2. Considering Area
+Area data
+https://en.wikipedia.org/wiki/Community_areas_in_Chicago#cite_note-CMAP_Area-10
+
+Geospatial Data
+https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Community-Areas-current-/cauq-8yn6
+
+Data Cleaning 
+```{r}
+comm_area = read_csv("data/mywiki.csv")
+comm_area_1 = comm_area %>% 
+  select(No., `Area(km2)`) %>% 
+  rename(comm = No.) %>%
+  mutate(comm = as.numeric(comm))
+  
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Join the two dataframe by the community code
+```{r}
+revenue_area = merge(mytrip, comm_area_1)
+revenue_area %>% mutate(standard_rev = total/`Area(km2)`) %>% arrange(desc(standard_rev))
+```
+just look at data
+```{r}
+comm_area %>% arrange(desc(`Density(km2)`))
+comm_area %>% arrange(desc(Population))
+```
+
+
+
+
+
