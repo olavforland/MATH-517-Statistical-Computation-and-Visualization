@@ -77,7 +77,6 @@ chicago_leaflet %>%
 class(areas$geometry)
 
 
-
 #-------------------------------------------------------------------------
 
 #Remaining: get valuable datasets to plot the map against. Trip_total doesn't work
