@@ -56,6 +56,10 @@ sample <- taxi_trips %>%
 
 ## explore the relationship among continuous variables
 
+frequency data, age - man/woman, woman - distribution, - stratify
+
+interactive,
+
 
 ```{r}
 summary(sample)
@@ -68,6 +72,19 @@ GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
 
 As expected, trip miles and trip total have strong positive correlation.
 While looking at the histogram of the continous variables, we can spot the pattern that most of the distribution have heavy tails, hence we do the logrithmic transformation.
+
+
+```{r}
+ggplot(sample_gally, aes(x = trip_total)) +
+  geom_histogram(binwidth = 3) + xlim(0, 150)
+
+```
+
+```{r}
+ggplot(sample_gally, aes(x = trip_total)) +
+  geom_histogram() +  scale_y_continuous(trans='log2') + scale_x_continuous(trans='log2') 
+```
+
 
 ```{r}
 ggplot(sample_gally, aes(x = trip_total)) +
