@@ -45,6 +45,11 @@ areas <- st_read("data/chicago_community_areas/chicago_community_areas.shp", as_
 #Trying to color each area by trip_total
 pal <- colorNumeric("Blues", domain = areas$trip_total)
 
+#Generate html labels
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g$",
+  areas$community_name, areas$trip_total
+) %>% lapply(htmltools::HTML)
 
 #Make the map
 chicago_leaflet %>%
@@ -55,7 +60,12 @@ chicago_leaflet %>%
               highlightOptions = highlightOptions(
                 weight=5,
                 color="#666",
-                bringToFront=TRUE)) %>%
+                bringToFront=TRUE),
+              label=labels,
+              labelOptions=labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
               
   addLegend("bottomright",
             pal = pal,
@@ -69,25 +79,8 @@ class(areas$geometry)
 
 
 #-------------------------------------------------------------------------
-#Earlier methods with ggplot
 
-ggplot(areas_geom) +
-  geom_polygon(mapping=aes(x=st_coordinates(areas_geom)["X"],
-                           y=st_coordinates(areas_geom)["Y"]), 
-               color="grey", fill="beige")
-test_chicago <- map_data("state", region="Illinois")
-areas_geom
-
-ggplot() +
-  geom_sf(data = areas_geom) 
-
-plot(areas_geom)
-
-ggplot(chicago) +
-  geom_polygon(mapping=aes(x=lon, y=lat), color="grey", fill="beige") +
-  geom_polygon(data=areas_geom, mapping=aes(x=st_coordinates(areas_geom)["X"],
-                                            y=st_coordinates(areas_geom)["Y"])) +
-  coord_map()
+#Remaining: get valuable datasets to plot the map against. Trip_total doesn't work
 
 
 
