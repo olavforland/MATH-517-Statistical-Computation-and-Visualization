@@ -119,10 +119,51 @@ zone_rev <- sample %>%
   dplyr::select(pickup_community_area, dropoff_community_area, trip_total) %>%
   mutate(across(c(pickup_community_area, dropoff_community_area),factor))
 
-zone_rev %>%
-  ggplot(aes(x=pickup_community_area, y=trip_total)) +
-  geom_boxplot(outlier.colour="black", outlier.shape=16,
-             outlier.size=2, notch=FALSE)
+pickup_zone <- zone_rev %>% 
+  dplyr::select(pickup_community_area, trip_total) %>% 
+  drop_na() # remove na now
+
+# keep the zones with highest revenue
+pick_up_top <- pickup_zone %>%
+  group_by(pickup_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(10) 
+
+# pickup_zone %>%
+#   filter(pickup_community_area %in% pick_up_top$pickup_community_area) %>% group_by(pickup_community_area) %>% count()
+
+# pickup$pickup_community_area
+pickup_zone %>%
+  filter(pickup_community_area %in% pick_up_top$pickup_community_area) %>%
+  ggplot(aes(x = pickup_community_area, y = trip_total, fill = pickup_community_area)) +
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0, 200)) + # we didn't actually remove the outliners, but to better visualise the data, we zoom in the place where we have the boxplots
+  scale_fill_brewer(palette="RdBu") +
+  theme_classic()
+  
+```
+
+drop off 
+```{r}
+dropoff_zone <- zone_rev %>% 
+  dplyr::select(dropoff_community_area, trip_total) %>% 
+  drop_na() # remove na now
+
+# keep the zones with highest revenue
+drop_off_top <- dropoff_zone %>%
+  group_by(dropoff_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(10) 
+
+dropoff_zone %>%
+  filter(dropoff_community_area %in% drop_off_top$dropoff_community_area) %>%
+  ggplot(aes(x = dropoff_community_area, y = trip_total, fill = dropoff_community_area)) +
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0, 150)) + # we didn't actually remove the outliners, but to better visualise the data, we zoom in the place where we have the boxplots
+  scale_fill_brewer(palette="rainbow") +
+  theme_classic()
 ```
 
 
