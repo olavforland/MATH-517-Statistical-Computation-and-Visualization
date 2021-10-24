@@ -6,25 +6,128 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, ggplot2, data.table, readr, qqplotr, GGally, lubridate, raster, spData, spDataLarge, tmap, osmdata)
+
+# library(remotes)
+# remotes::install_github("ropensci/osmdata")
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Load data, clean name and get sample
 
 ```{r cars}
-summary(cars)
+mytable <- read_csv("data/taxi_trips_2020.csv") %>%
+  clean_names() %>%
+  print()
+
+set.seed(123)
+sample <- mytable %>%
+  sample_n(10000)
 ```
 
-## Including Plots
+## Map for roads and popular areas
+We look at the tag of amenities and find plot out the places where people are likely to take taxi.
 
-You can also embed plots, for example:
+```{r}
+# available_tags("amenity")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+q1 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "theatre") %>% osmdata_sf()
+
+q2 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "restaurant") %>% osmdata_sf()
+
+q3 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "hospital") %>% osmdata_sf()
+
+
+# str(q4) #query structure
+q_all = c (q1, q2, q3)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+```{r}
+mad_map <- get_map(getbb("Chicago"), maptype = "toner-background")
+
+ggmap(mad_map) +
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE, colour = "red",size = 0.5, alpha = 0.1) +
+  labs(title = "Chicago", subtitle = "41.8781°N / 87.6298°W") 
+  # geom_sf(data = airport$osm_points,inherit.aes = FALSE, colour = "black",size = 1, alpha = 0.3)
+```
+
+To make the road more visible, we plot the roads out instead.
+```{r}
+# available_tags("highway")
+big_streets <- getbb("Chicago")%>%
+  opq()%>%
+  add_osm_feature(key = "highway", 
+                  value = c("motorway", "primary", "motorway_link", "primary_link")) %>%
+  osmdata_sf()
+
+med_streets <- getbb("Chicago")%>%
+  opq()%>%
+  add_osm_feature(key = "highway", 
+                  value = c("secondary", "tertiary", "secondary_link", "tertiary_link")) %>%
+  osmdata_sf()
+
+
+# small_streets <- getbb("Chicago")%>%
+#   opq()%>%
+#   add_osm_feature(key = "highway", 
+#                   value = c("residential", "living_street",
+#                             "unclassified",
+#                             "service", "footway"
+#                   )) %>%
+#   osmdata_sf()
+
+
+ggplot() +
+  geom_sf(data = big_streets$osm_lines,
+          inherit.aes = FALSE,
+          color = "black",
+          size = .3,
+          alpha = .3) + 
+  geom_sf(data = med_streets$osm_lines,
+          inherit.aes = FALSE,
+          color = "#666666",
+          size = .2,
+          alpha = .3) +
+  labs(title = "Chicago", subtitle = "41.8781°N / 87.6298°W") +
+  theme_void() +
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE, colour = "#238443",
+          fill = "#004529",
+          alpha = .1,
+          size = 1,
+          shape = 21) 
+    theme(plot.title = element_text(size = 20, family = "lato", face="bold", hjust=.5), plot.subtitle = element_text(family = "lato", size = 8, hjust=.5, margin=margin(2, 0, 5, 0))) 
+```
+## Basics
+
+```{r}
+summary(sample)
+sample_gally <- sample %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
+GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
+```
+
+## Zones vs Revenue
+```{r}
+zone_rev <- sample %>% 
+  dplyr::select(pickup_community_area, dropoff_community_area, trip_total) %>%
+  mutate(across(c(pickup_community_area, dropoff_community_area),factor))
+
+zone_rev %>%
+  ggplot(aes(x=pickup_community_area, y=trip_total)) +
+  geom_boxplot(outlier.colour="black", outlier.shape=16,
+             outlier.size=2, notch=FALSE)
+```
+
+
+## Zones vs Time
+
+
+
+
