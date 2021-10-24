@@ -103,10 +103,11 @@ Join the two dataframe by the community code
 revenue_area = merge(mytrip, comm_area_1)
 revenue_area %>% mutate(standard_rev = total/`Area(km2)`) %>% arrange(desc(standard_rev))
 ```
-just look at data
+just a conflict?
 ```{r}
+adfdsa
 comm_area %>% arrange(desc(`Density(km2)`))
-comm_area %>% arrange(desc(Population))
+xyz
 ```
 
 
