@@ -88,6 +88,9 @@ chicago_leaflet %>%
 #Sort based on hour of the day
 taxi_trips$trip_start=(paste(substr(taxi_trips$trip_start_timestamp,12,13),substr(taxi_trips$trip_start_timestamp,21,22)))
 
+<<<<<<< HEAD
+#-------------------------------------------------------------------------
+=======
 glimpse(taxi_trips)
 
 taxi_trips %>% group_by(trip_start) %>% count()
@@ -115,6 +118,7 @@ taxi_trips$trip_start[taxi_trips$trip_start == "08 PM"] <- 21
 taxi_trips$trip_start[taxi_trips$trip_start == "09 PM"] <- 22
 taxi_trips$trip_start[taxi_trips$trip_start == "10 PM"] <- 23
 taxi_trips$trip_start[taxi_trips$trip_start == "11 PM"] <- 24
+>>>>>>> origin
 
 glimpse(taxi_trips)
 
