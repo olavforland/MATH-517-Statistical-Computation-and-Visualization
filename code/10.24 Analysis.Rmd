@@ -130,6 +130,8 @@ pick_up_top <- pickup_zone %>%
   arrange(desc(trip_total)) %>%
   top_n(10) 
 
+pick_up_top
+
 # pickup_zone %>%
 #   filter(pickup_community_area %in% pick_up_top$pickup_community_area) %>% group_by(pickup_community_area) %>% count()
 
@@ -143,6 +145,10 @@ pickup_zone %>%
   theme_classic()
   
 ```
+
+It is obvious that zone 76 and zone 8 generate the highest total revenue. However, for a single driver, zone 76 and zone 56 might be preferred since they have a higher average (median) revenue per trip.
+
+We prefer using median over mean because the distribution of revenue is skewed.
 
 drop off 
 ```{r}
@@ -166,8 +172,26 @@ dropoff_zone %>%
   theme_classic()
 ```
 
+### pickup - dropoff pair total revenue
+olav's original codes
+```{r}
+df1 <- sample %>%
+  group_by(pickup_community_area, dropoff_community_area) %>%
+  summarise(total = sum(trip_total)) %>%
+  # mutate(total=as.factor(total)) %>%
+  drop_na()
+df1 %>%  
+  ggplot(aes(x=pickup_community_area, y=dropoff_community_area)) +
+  geom_point(aes(size = total),alpha = 1/2, colour = "orange") +
+  theme_bw()
+```
 
-## Zones vs Time
+
+## Time vs Zones
+
+```{r}
+
+```
 
 
 
