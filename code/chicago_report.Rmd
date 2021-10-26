@@ -13,7 +13,7 @@ pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, R
 #Register API key to google
 register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
 
-load("../data/chicago_maps_workspace.RData")
+load("../workspaces/olav_workspace.RData")
 
 ```
 
