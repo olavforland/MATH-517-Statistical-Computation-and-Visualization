@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Chicago Taxi Data Analysis</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Yiren" />
+    <meta name="date" content="2021-10-27" />
+    <script src="index_files/header-attrs-2.11/header-attrs.js"></script>
+    <link href="index_files/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="index_files/font-awesome-5.3.1/css/fontawesome-all.min.css" rel="stylesheet" />
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({
+        TeX: { equationNumbers: { autoNumber: "AMS" } },
+      });
+    </script>
+    <style>
+    .mjx-mrow a {
+      color: black;
+      pointer-events: none;
+      cursor: default;
+    }
+    </style>
+    <link rel="stylesheet" href="assets/sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="assets/sydney.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Chicago Taxi Data Analysis
+## SCV Group
+### Yiren
+### 27 Oct 2021
+
+---
+
+
+class: title-slide,middle
+background-image: url("pikapika.svg"), url("assets/title-image1.jpg")
+background-position: 10% 90%, 100% 50%
+background-size: 160px, 50% 100%
+background-color: #0148A4
+
+
+# .text-shadow[.white[Test]]
+
+## .white[Animation]
+
+---
+.pull-left[
+&lt;!-- The purpose of this statistical report is to bring light to what particular risk factors help predict infant birth weight. The future health of the infant can be predicted from the birth weight of the child. --&gt;
+
+
+&lt;!-- The data was collected from Baystate Medical Center, Springfield, Massachusetts in 1986 which is accessible in Rstudio via the MASS package under ‘birthwt’. --&gt;
+
+]
+
+.pull-right[
+&lt;div class="figure" style="text-align: right"&gt;
+&lt;img src="my_anim_whole.gif" alt="Baystate Medical Center"  /&gt;
+&lt;p class="caption"&gt;Baystate Medical Center&lt;/p&gt;
+&lt;/div&gt;
+
+]
+
+&lt;!-- .footnote[ --&gt;
+&lt;!-- By Yiren --&gt;
+&lt;!-- ] --&gt;
+---
+
+## Questions
+
+&lt;!-- .pull-left[ --&gt;
+&lt;!-- 1. If smoking is in fact a predicting factor for birth weight of babies, in particular does it have a negative coefficient. --&gt;
+
+&lt;!-- 2. Does mother’s birth weight in the last menstrual period predict baby birth weight? --&gt;
+
+&lt;!-- 3. What are all the significant predicting factors of baby birth weight? --&gt;
+&lt;!-- ] --&gt;
+
+&lt;!-- .pull-right[ --&gt;
+&lt;img src="Picture2.png" width="507" style="display: block; margin: auto 0 auto auto;" /&gt;
+
+&lt;!-- ] --&gt;
+
+&lt;!-- .footnote[ --&gt;
+&lt;!-- By Yiren --&gt;
+&lt;!-- ] --&gt;
+---
+
+
+
+
+
+
+
+&lt;img src="pics/1.png" width="5120" /&gt;
+
+---
+
+
+
+---
+
+
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Pre Analysis Observations --&gt;
+
+
+&lt;!-- There are ten variables in this dataset, as shown by the summary statistics: --&gt;
+
+&lt;!-- - Mean birth weight is approximately 2.9kg, about 600 grams below the expected mean of 3.5kg. This is within the normal range of weights of 2.5kg- --&gt;
+
+
+
+
+&lt;!-- .scroll-box-14[ --&gt;
+&lt;!-- ```{r, echo = FALSE, warning=FALSE} --&gt;
+&lt;!-- library(MASS) --&gt;
+&lt;!-- library(janitor) --&gt;
+&lt;!-- library(skimr) --&gt;
+&lt;!-- library(tidyr) --&gt;
+&lt;!-- library(readr) --&gt;
+&lt;!-- library(ggfortify) --&gt;
+&lt;!-- library(dplyr) --&gt;
+&lt;!-- library(tidyverse) --&gt;
+&lt;!-- library(ggplot2) --&gt;
+&lt;!-- library(visdat) --&gt;
+&lt;!-- library(sjPlot) --&gt;
+&lt;!-- library(leaps) --&gt;
+&lt;!-- library(caret) --&gt;
+&lt;!-- library(regclass) --&gt;
+&lt;!-- data = birthwt --&gt;
+&lt;!-- summary(data) --&gt;
+&lt;!-- ``` --&gt;
+&lt;!-- ] --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ## birthwt in R --&gt;
+
+&lt;!-- Here a glimpse of the data set we are going to use in the further research. --&gt;
+
+
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE} --&gt;
+&lt;!-- data = birthwt --&gt;
+&lt;!-- glimpse(data) --&gt;
+&lt;!-- ``` --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ### data handling --&gt;
+&lt;!-- # data --&gt;
+&lt;!-- .scroll-box-14[ --&gt;
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE} --&gt;
+&lt;!-- data = MASS::birthwt --&gt;
+&lt;!-- glimpse(data) --&gt;
+&lt;!-- summary(data) --&gt;
+&lt;!-- head(data) --&gt;
+&lt;!-- # data %&gt;% skimr::skim() --&gt;
+&lt;!-- # visdat::vis_miss(data) --&gt;
+
+&lt;!-- data = data %&gt;% mutate( --&gt;
+&lt;!--   low = as.factor(low), --&gt;
+&lt;!--   race = as.character(race), --&gt;
+&lt;!--   smoke = as.character(smoke), --&gt;
+&lt;!--   ui = as.character(ui), --&gt;
+&lt;!--   ht = as.character(ht) --&gt;
+&lt;!-- ) --&gt;
+
+&lt;!-- data_without_low = data %&gt;% dplyr::select(-low) --&gt;
+&lt;!-- data_with_low = data --&gt;
+&lt;!-- ``` --&gt;
+&lt;!-- ] --&gt;
+&lt;!-- --- --&gt;
+&lt;!-- class: title-slide,middle --&gt;
+&lt;!-- background-image: url("assets/pika2.svg"), url("assets/title-image3.jpg") --&gt;
+&lt;!-- background-position: 10% 90%, 100% 50% --&gt;
+&lt;!-- background-size: 160px, 50% 100% --&gt;
+&lt;!-- background-color: #0148A4 --&gt;
+
+
+&lt;!-- # .text-shadow[.white[Assumption Checking]] --&gt;
+
+&lt;!-- ## .white[Yiren Cao] --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Checking - Linearity, Homoskedasticity --&gt;
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=16, fig.height=15} --&gt;
+
+&lt;!-- data_without_low_for_correlation = data_without_low --&gt;
+&lt;!-- data_without_low_for_correlation[] &lt;- lapply(data_without_low_for_correlation,  --&gt;
+&lt;!--                                              function(x) as.numeric(as.character(x))) --&gt;
+&lt;!-- {{qtlcharts::iplotCorr(data_without_low_for_correlation)}} # non-multicollinearity --&gt;
+
+&lt;!-- ``` --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8} --&gt;
+&lt;!-- GGally::ggpairs(data_without_low) --&gt;
+&lt;!-- ``` --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Checking - Linearity, Homoskedasticity, Normality --&gt;
+
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6} --&gt;
+&lt;!-- lm1_without_low = lm(bwt ~ ., data = data_without_low) --&gt;
+&lt;!-- autoplot(lm1_without_low, which = 1:2) # linearity + normality --&gt;
+
+
+&lt;!-- ``` --&gt;
+
+&lt;!-- ```{r, echo = FALSE} --&gt;
+&lt;!-- icon::fa("bell") --&gt;
+&lt;!-- ``` --&gt;
+
+&lt;!-- - In addition, we can assume the Independence! --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Checking - No Multicollinearity --&gt;
+
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=5} --&gt;
+&lt;!-- M1 = lm1_without_low  # Full model --&gt;
+&lt;!-- vif_values &lt;- regclass::VIF(M1) --&gt;
+&lt;!-- vif_values --&gt;
+
+&lt;!-- ``` --&gt;
+
+&lt;!-- .blockquote[ --&gt;
+&lt;!-- ### `&lt;i class="fas  fa-location-arrow "&gt;&lt;/i&gt;`{=html} Variance Inflation Factor (VIF) --&gt;
+&lt;!-- - when VIF is equal to 1, the independent variables are not correlated to the one another --&gt;
+&lt;!-- ] --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- class: inverse, center, middle --&gt;
+&lt;!-- # Another model: with `low` predictor --&gt;
+
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Checking - Linearity, Homoskedasticity, Normality --&gt;
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6} --&gt;
+&lt;!-- reg1 = lm(bwt ~ ., data = data_with_low) --&gt;
+&lt;!-- autoplot(reg1, which = 1:2) --&gt;
+&lt;!-- ``` --&gt;
+
+&lt;!-- ```{r, echo = FALSE} --&gt;
+&lt;!-- icon::fa("bell") --&gt;
+&lt;!-- ``` --&gt;
+
+&lt;!-- - In addition, we can assume the Independence! --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Checking - No Multicollinearity --&gt;
+
+&lt;!-- ```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5} --&gt;
+&lt;!-- vif_values_with_low &lt;- regclass::VIF(reg1) --&gt;
+&lt;!-- vif_values_with_low --&gt;
+&lt;!-- ``` --&gt;
+
+
+
+
+
+&lt;!-- --- --&gt;
+&lt;!-- Please add analysis here --&gt;
+
+&lt;!-- --- --&gt;
+&lt;!-- class: title-slide,middle --&gt;
+&lt;!-- background-image: url("assets/pika2.svg"), url("assets/title-image2.jpg") --&gt;
+&lt;!-- background-position: 10% 90%, 100% 50% --&gt;
+&lt;!-- background-size: 160px, 50% 100% --&gt;
+&lt;!-- background-color: #0148A4 --&gt;
+
+
+&lt;!-- # .text-shadow[.white[Model Selection]] --&gt;
+&lt;!-- # .text-shadow[.white[Assumption Re-check]] --&gt;
+
+&lt;!-- ## .white[Yiren Cao] --&gt;
+
+&lt;!-- --- --&gt;
+
+&lt;!-- ## Model Selection --&gt;
+
+&lt;!-- ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=5, fig.height=5} --&gt;
+&lt;!-- cv_with_low = train( --&gt;
+&lt;!--   bwt ~ low + ui+ smoke + race, data, --&gt;
+&lt;!--   method = "lm", --&gt;
+&lt;!--   trControl = trainControl( --&gt;
+&lt;!--     method = "cv", number = 10, --&gt;
+&lt;!--     verboseIter = FALSE --&gt;
+&lt;!--   ) --&gt;
+&lt;!-- ) --&gt;
+&lt;!-- cv_without_low = train( --&gt;
+&lt;!--   bwt ~ lwt + race + smoke + ht+ ui, data_without_low, --&gt;
+&lt;!--   method = "lm", --&gt;
+&lt;!--   trControl = trainControl( --&gt;
+&lt;!--     method = "cv", number = 10, --&gt;
+&lt;!--     verboseIter = FALSE --&gt;
+&lt;!--   ) --&gt;
+&lt;!-- ) --&gt;
+&lt;!-- # cv_without_low --&gt;
+&lt;!-- # cv_with_low --&gt;
+
+
+&lt;!-- results = resamples(list(without_low = cv_without_low, with_low = cv_with_low)) --&gt;
+&lt;!-- ggplot(results, metric = "RMSE") + labs(y = "RMSE") --&gt;
+&lt;!-- ggplot(results, metric = "MAE") + labs(y = "MAE") --&gt;
+&lt;!-- ggplot(results, metric = "Rsquared") + labs(y = "R squared") --&gt;
+
+
+&lt;!-- icon::fa("spinner", size = 2, animate = "spin") --&gt;
+&lt;!-- ``` --&gt;
+
+
+&lt;!-- --- --&gt;
+&lt;!-- ## Assumption Re-check --&gt;
+&lt;!-- ```{r,  echo = FALSE, fig.width=10, fig.height=5} --&gt;
+&lt;!-- step.back.aic = step(M1, direction = "backward", trace = FALSE) --&gt;
+&lt;!-- autoplot(step.back.aic, which = 1:2) --&gt;
+&lt;!-- vif_values_without_low &lt;- regclass::VIF(step.back.aic) --&gt;
+&lt;!-- vif_values_without_low --&gt;
+&lt;!-- ``` --&gt;
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script src="assets/remark-zoom.js"></script>
+<script src="https://platform.twitter.com/widgets.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9",
+"navigation": {
+"scroll": false
+}
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
