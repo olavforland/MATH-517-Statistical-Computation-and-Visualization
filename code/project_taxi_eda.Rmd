@@ -1,0 +1,290 @@
+---
+title: "Project_Taxis"
+author: "Daryna"
+date: "10/25/2021"
+output: html_document
+---
+
+# Introduction
+
+## Statement of the goal
+In this report we analyze the Taxi Trips in Chicage 2020 dataset. The aim of the project is to define what variables may influence the revenue for the taxi cabs. We are specifically interested to understand how the cost of trip varies depending on the community area and which areas generate the highest revenue. We then will study how the cost of the trip changes depending on the taxi company. 
+
+## Brief summary of the approach
+We first present an exploratory data analysis which allows to familiarize with the data: study the distribution of continous variables, the proportion of categories in categorical variables and the relation between those. We study first the descriptive statistics with respect to the community areas and then with respect to the taxi company. We then present an interactive map of Chicago which shows which areas depending on the time varibales are more or less  profitable. 
+
+## Introduction to the problem
+This problem has been studied before but mostly whith respect to the duration of the trip. We think our analysis may be relevant for taxi companies for the task of assignment of taxi cabs around the city of Chicago. 
+
+
+# Exploratory Data Analysis 
+
+```{r}
+# Let's first load the packages we will use 
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(ggrepel)
+library(tidyverse)
+library(psych)
+```
+
+
+```{r}
+# Load the data
+data = read.csv("Taxi_Trips_-_2020.csv")
+```
+
+```{r}
+# Further away, we will work on a random subset of the dataset as the data is very large and the computations take too much time.
+data_sample = data[sample(nrow(data), 10000), ]
+```
+
+
+### Basic information about the variables
+
+```{r}
+# Statistics
+describe(data_sample)
+```
+
+```{r}
+# Allows to see whether the variable is continuous or categorical
+str(data_sample)
+```
+
+```{r}
+# We want to transform data into a dataframe format
+typeof(data_sample)
+```
+
+
+
+```{r}
+df = as.data.frame(data_sample)
+```
+
+
+```{r}
+typeof(df)
+```
+
+
+
+## Continuous variables 
+
+```{r}
+qplot(data_sample$Trip.Total,
+      geom="histogram",
+      binwidth = 100,  
+      main = "Histogram for Trip Total", 
+      xlab = "Trip.Total",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2))
+```
+The distribution of Trip.Total seems to follow a power law sitribution. We should consider to take the logarithm of Trip.Total to normalize.
+
+```{r}
+qplot(data_sample$Trip.Total,
+      geom="histogram",
+      binwidth = 100,  
+      main = "Histogram for Trip Total", 
+      xlab = "Trip.Total",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2))
+```
+
+```{r}
+qplot(data_sample$Trip.Miles,
+      geom="histogram",
+      binwidth = 50,  
+      main = "Histogram for Trip Miles", 
+      xlab = "Trip.Miles",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2))
+```
+
+Let's create logarithms for the continuous variable 
+```{r}
+data_sample <- data_sample %>% 
+  mutate(log.Trip.Total = log(Trip.Total))
+```
+
+```{r}
+qplot(data_sample$log.Trip.Total,
+      geom="histogram",
+      binwidth = 0.2,  
+      main = "Histogram for Log Trip Total", 
+      xlab = "Log Trip.Total",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2))
+```
+
+```{r}
+ggplot(data=data_sample , aes(log.Trip.Total)) + geom_histogram(aes(y=..density..),bins=100) + geom_density(col="red") + theme_classic()
+```
+
+
+
+```{r}
+ggplot(data_sample, aes(Trip.Total)) + geom_boxplot() +geom_boxplot(outlier.colour = "red", outlier.shape = 1) + geom_boxplot(fill = "white", colour = "#3366FF") + coord_flip()
+```
+
+```{r}
+ggplot(data_sample, aes(log.Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + geom_boxplot(fill = "white", colour = "#3366FF") + coord_flip()
+```
+
+
+
+```{r}
+qplot(data_sample$Trip.Seconds,
+      geom="histogram",
+      binwidth = 100,  
+      main = "Histogram for Trip Seconds", 
+      xlab = "Trip.Seconds",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2)) # power law
+```
+
+Let's create logarithms for the continuous variable 
+```{r}
+data_sample <- data_sample %>% 
+  mutate(log.Trip.Seconds = log(Trip.Seconds))
+```
+
+
+```{r}
+qplot(data_sample$log.Trip.Seconds,
+      geom="histogram",
+      binwidth = 0.2,  
+      main = "Histogram for log Trip Seconds", 
+      xlab = "log.Trip.Seconds",  
+      fill=I("blue"), 
+      col=I("red"), 
+      alpha=I(.2)) # power law
+```
+
+## Categorical Variables 
+Let's explore now the most pick up community areas in which the taxis are found most often
+```{r}
+pickup_areas_ordered <- table(data_sample$Pickup.Community.Area)
+```
+
+```{r}
+pickup_areas_ordered <- as.data.frame(pickup_areas_ordered)
+```
+
+```{r}
+pickup_areas_ordered <- pickup_areas_ordered[order(pickup_areas_ordered$Freq, decreasing = TRUE),] 
+```
+
+```{r}
+top_pickup <- pickup_areas_ordered[1:10,]
+bottom_pickup <- pickup_areas_ordered[11:77,]
+sum_bottom = sum(as.numeric(bottom_pickup$Freq), na.rm = TRUE)
+top_pickup <- top_pickup %>% add_row(Var1 = "Other", Freq = sum_bottom)
+top_pickup$Freq <- as.numeric(top_pickup$Freq)
+# Getting proportions
+top_pickup <- top_pickup %>% 
+  mutate(Proportion = Freq/sum(Freq))
+```
+
+# Visualisation of Categorical Variables
+```{r}
+ggplot(top_pickup, aes(x=Var1, y=Freq, color=Var1)) +
+  geom_bar(stat="identity", fill="white") + xlab("Frequency") + ylab("Pick Up Area") + ggtitle("Frequency by Area")
+```
+
+
+```{r}
+top_pickup_pc <- top_pickup[order(top_pickup$Freq),] 
+top_pickup_pc <- top_pickup_pc[-c(9), ]
+top_pickup_pc <- top_pickup_pc %>% add_row(Var1 = "Other", Freq = 1537, Proportion = 0.16598272	)
+```
+
+
+
+```{r}
+top_pickup_pc <- top_pickup[order(top_pickup$Freq),] 
+top_pickup_pc <- top_pickup_pc[-c(9), ]
+# top_pickup_pc <- top_pickup_pc %>% add_row(Var1 = "Other", Freq = 1537, Proportion = 0.16598272	)
+top_pickup_pc <- top_pickup_pc[c(11,1:10:nrow(top_pickup_pc)), ]
+top_pickup_pc <- top_pickup_pc[-c(12), ]
+```
+
+
+
+```{r}
+# Get the positions
+# Get the positions
+top_pickup2 <- top_pickup %>% 
+  mutate(csum = rev(cumsum(rev(Freq))), 
+         pos = Freq/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), Freq/2, pos))
+
+ggplot(top_pickup_pc, aes(x = "" , y = Freq, fill = fct_inorder(Var1))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Set3") +
+  #geom_label_repel(data = top_pickup2,
+                 #  aes(y = pos, label = paste0(Freq, "%")),
+                 #  size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Pick Up Area")) +
+  theme_void()+  ggtitle("Frequency by Area")
+```
+
+
+## Boxplots representing Trip Total of the most common Areas
+```{r}
+# First take subset of the most common Areas
+sample_common_ares <- subset(data_sample, Pickup.Community.Area == 56 | Pickup.Community.Area == 77 | Pickup.Community.Area == 3 | Pickup.Community.Area == 7 | Pickup.Community.Area == 33 | Pickup.Community.Area == 6 | Pickup.Community.Area == 76 | Pickup.Community.Area == 28 | Pickup.Community.Area == 32 | Pickup.Community.Area == 8)
+```
+
+```{r}
+sample_common_ares[,"Pickup.Community.Area"] <- as.factor(sample_common_ares[,"Pickup.Community.Area"])
+sapply(sample_common_ares, class) 
+```
+
+```{r}
+ggplot(sample_common_ares, aes(Pickup.Community.Area, log.Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
+```
+We can see that for areas 56 and 76, it seems like the revenue is higher 
+
+```{r}
+ggplot(sample_common_ares, aes(Pickup.Community.Area, Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
+# There are some crazy outliers
+```
+
+
+```{r}
+ggplot(sample_common_ares, aes(x=log.Trip.Total, fill=Pickup.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity', bins = 50)
+```
+
+
+```{r}
+ggplot(sample_common_ares, aes(x=Trip.Total, fill=Pickup.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity')
+```
+
+## Realtion between continious variables 
+```{r}
+ggplot(data=data_sample,aes(x=Trip.Total,y=Trip.Seconds)) +
+theme_classic() +
+theme(text = element_text(size=5),legend.position = c(0.2, 0.8),legend.key.size = unit(0.2, 'cm')) + xlab("Trip Total") +
+ylab("Trip Seconds")  + geom_point()
+```
+
+
+```{r}
+ggplot(data=data_sample,aes(x=log.Trip.Total,y=log.Trip.Seconds)) +
+theme_classic() +
+theme(text = element_text(size=5),legend.position = c(0.2, 0.8),legend.key.size = unit(0.2, 'cm')) + xlab("log Trip Total") +
+ylab("log Trip Seconds")  + geom_point()
+```
+
