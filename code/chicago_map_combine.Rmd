@@ -1,0 +1,815 @@
+---
+title: 'Report'
+author: "SCV Group"
+date: "`r format(Sys.time(), '%a %b %d %Y')`"
+output:
+  slidy_presentation: default
+  beamer_presentation: null
+theme: Madrid
+colortheme: seahorse
+footer: Copyright (c) 2021, EPFL
+editor_options:
+  markdown:
+    wrap: 72
+runtime: shiny
+---
+
+We have two questions to be answered:
+1. What are the popular places in Chicago for each hour based on the taxi location?
+2. Where should driver go in order to earn most income in Chicago?
+
+
+```{r}
+# load("/Users/yirencao/Documents/GitHub/SCV/code/work1.RData")
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r loading package, echo=FALSE, warning=FALSE, include=FALSE}
+pacman::p_load(shiny, tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, ggplot2, data.table, readr, qqplotr, GGally, lubridate, raster, spData, spDataLarge, tmap, osmdata, gifski)
+
+#Register API key to google
+register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+
+
+```
+
+## load data
+
+```{r}
+mytable <- read_csv("data/taxi_trips_2020.csv") %>%
+  clean_names() 
+
+taxi_trips<- mytable
+
+set.seed(123)
+my_sample <- mytable %>%
+  sample_n(10000)
+
+```
+
+## Visualise Data
+
+First of all, we do the basic analysis on the dataset and look at each variable. For the continues variables, they were visualised using ggpair function in GGally package, a powerful tool that gives scatterplot for each pair of the variables and a histogram for each single variable, as well as the correlation between each pair of variables. For instance, we expect to see a correlation between trip_total and trip_miles. In the scatter plot, we can spot an almost linear line and also the outliners. In the correlation cell, we get a correlation coefficient of 0.467, which indicates a moderate positive association.
+```{r visual,  warning=FALSE}
+sample_gally <- my_sample %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
+GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
+```
+
+
+
+
+To further visualise the variable trip_total which is of our main interest, we use a geom_histogram in ggplot2 and carefully select the binwidth.
+
+```{r}
+ggplot(sample_gally, aes(x = trip_total)) +
+  geom_histogram(binwidth = 3) + xlim(0, 150)
+```
+
+
+
+## Boxplots: Revenue vs. Zone
+With regards to discrete variables, we have 77 zones in Chicago and it is too much to plot out. However, since we are interested in the zones the generate most revenue, we plot out the top 10 zones. To visualise the distribution of the data as well as give a comprehensive comparison among zones, we use boxplots in parallel. From the plots below, it is clear that zone 76 and zone 56 generate the most revenue, whereas they are also the two zones where the average avenue reaches the highest, hence they might be where drivers like most.
+```{r x1, warning=FALSE}
+zone_rev <- my_sample %>% 
+  dplyr::select(pickup_community_area, dropoff_community_area, trip_total) %>%
+  mutate(across(c(pickup_community_area, dropoff_community_area),factor))
+
+pickup_zone <- zone_rev %>% 
+  dplyr::select(pickup_community_area, trip_total) %>% 
+  drop_na() # remove na now
+
+# keep the zones with highest revenue
+pick_up_top <- pickup_zone %>%
+  group_by(pickup_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(10) 
+
+pick_up_top
+
+pickup_zone %>%
+  filter(pickup_community_area %in% pick_up_top$pickup_community_area) %>%
+  ggplot(aes(x = pickup_community_area, y = trip_total, fill = pickup_community_area)) +
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0, 200)) + # we didn't actually remove the outliners, but to better visualise the data, we zoom in the place where we have the boxplots
+  theme_classic()
+```
+
+Further, we prefer using median over mean because the distribution of revenue is skewed.
+
+```{r, fig.width=10, fig.height=8}
+top5 <- pickup_zone %>%
+  group_by(pickup_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(5)
+
+sample_gally <- my_sample %>% dplyr::select(trip_miles, trip_total, pickup_community_area) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>% filter(pickup_community_area %in% top5$pickup_community_area) %>% filter(trip_total <= 200)
+
+sample_gally %>% group_by(pickup_community_area) %>% count()
+                                                                              
+GGally::ggpairs(sample_gally,  mapping = aes(col = pickup_community_area), cardinality_threshold=NULL) + theme_bw(base_size = 22)
+```
+
+As for the dropoff area, it is obvious that zone 76 produced most revenue. 
+```{r x2, warning=FALSE}
+dropoff_zone <- zone_rev %>% 
+  dplyr::select(dropoff_community_area, trip_total) %>% 
+  drop_na() # remove na now
+
+# keep the zones with highest revenue
+drop_off_top <- dropoff_zone %>%
+  group_by(dropoff_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(10) 
+
+dropoff_zone %>%
+  filter(dropoff_community_area %in% drop_off_top$dropoff_community_area) %>%
+  ggplot(aes(x = dropoff_community_area, y = trip_total, fill = dropoff_community_area)) +
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0, 150)) + # we didn't actually remove the outliners, but to better visualise the data, we zoom in the place where we have the boxplots
+  theme_classic()
+```
+However, we prefer using pickup_community_area over dropoff_comunity_area to answer our question since we see the pickup zone as the location where new revenue are generated and are of driver’s interest.
+
+After looking at the revenue map, we wonder why some of places generate more revenue than others? To further explore the reason, we introduce outside dataset about the amenities as well as the population data from Wikipedia.
+
+
+## Total Revenue
+```{r x3, warning=FALSE}
+trip_total_in_area <- mytable %>%
+  dplyr::select(pickup_community_area, trip_total) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>%
+  group_by(pickup_community_area) %>%
+  drop_na() %>%
+  summarise(trip_total = sum(trip_total)) # error???
+
+#Get location of chicago
+chicago <- geocode("Chicago, IL")
+
+#Make leaflet map with chicago center
+chicago_leaflet <- leaflet() %>%
+  setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
+  addProviderTiles(providers$CartoDB.Positron)
+
+
+#Save chicago areas to use for plotting
+areas <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
+  clean_names() %>%
+  dplyr::select(area_numbe, community, geometry) %>%
+  mutate(geometry = st_geometry(geometry),
+         area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable
+  rename(pickup_community_area = area_numbe,
+         community_name = community) %>%
+  inner_join(trip_total_in_area, by="pickup_community_area")
+
+# print(areas)
+#Trying to color each area by trip_total
+pal <- colorBin("Blues",bins=4, domain =log10(areas$trip_total), )
+
+#Generate html labels
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g$ trip total",
+  areas$community_name, areas$trip_total
+) %>% lapply(htmltools::HTML)
+
+#Make the map
+chicago_leaflet %>%
+  addPolygons(data=areas,
+              fillColor=~pal(log10(areas$trip_total)),
+              color="lightgrey",
+              weight=2,
+              fillOpacity=0.8,
+              highlightOptions = highlightOptions(
+                weight=3,
+                opacity=2,
+                color="azure1",
+                bringToFront=TRUE),
+              label=labels,
+              labelOptions=labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+
+  addLegend("bottomright",
+            pal = pal,
+            values = log10(areas$trip_total),
+            title = "Trip total",
+            opacity = 0.8,
+            labFormat = leaflet::labelFormat(
+              transform = function(x) 10^(x)))
+
+```
+
+
+## Population
+
+We think population might be one of the main factors that affects the total avenue of each zone. Hence we extract the population data from Wikipedia page and join it into our original dataset. 
+
+We apply logarithmic function on population to make the map more sensible. After comparing the two maps, we think the population might be one of the exploratory variables to the total revenue.
+
+```{r}
+# comm_area %>% 
+#   dplyr::select(No., Population, `Area(km2)`, `Density(km2)`) %>% 
+#   dplyr::rename(pickup_community_area = No. )
+```
+
+
+```{r x4, warning=FALSE}
+comm_area = read_csv("/Users/yirencao/Documents/GitHub/SCV/code/data/mywiki.csv")
+comm_area_1 = comm_area %>% 
+  dplyr::select(No., Population) %>% 
+  rename(pickup_community_area = No.) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) 
+
+
+
+## modified olav's codes
+areas <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
+  clean_names() %>%
+  dplyr::select(area_numbe, community, geometry) %>%
+  mutate(geometry = st_geometry(geometry),
+         area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable
+  rename(pickup_community_area = area_numbe,
+         community_name = community) %>%
+  inner_join(comm_area_1, by="pickup_community_area") 
+
+print(areas)
+#Trying to color each area by Population
+pal <- colorBin("Oranges",bins=4, domain =log2(areas$Population))
+
+#Generate html labels
+labels <- sprintf(
+  " <strong>%s</strong><br/>Population: %g",
+  areas$community_name, areas$Population
+) %>% lapply(htmltools::HTML)
+
+
+# pal <- colorNumeric("viridis", NULL)
+
+#Register API key to google
+register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+
+#Get location of chicago
+chicago <- geocode("Chicago, IL")
+
+#Make leaflet map with chicago center
+chicago_leaflet <- leaflet() %>% 
+  setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
+  addProviderTiles(providers$CartoDB.Positron) 
+```
+
+
+```{r xx1, warning=FALSE}
+#Make the map
+chicago_leaflet %>%
+  addPolygons(data=areas,
+              fillColor=~pal(log2(areas$Population)),
+              color="lightgrey",
+              weight=2,
+              fillOpacity=0.8,
+              highlightOptions = highlightOptions(
+                weight=3,
+                opacity=2,
+                color="azure1",
+                bringToFront=TRUE),
+              label=labels,
+              labelOptions=labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  
+  addLegend("bottomright",
+            pal = pal,
+            values = log2(areas$Population),
+            title = "Population",
+            opacity = 0.8,
+            labFormat = leaflet::labelFormat(
+              transform = function(x) round(2^(x))))
+
+```
+
+## PCA
+```{r}
+income <- read_csv("data/Per_Capita_Income.csv") %>%
+  clean_names() %>%
+  dplyr::rename(pickup_community_area = community_area_number) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) 
+
+comm_area_joined = comm_area %>% 
+  dplyr::select(No., `Area(km2)`, `Density(km2)`) %>% 
+  dplyr::rename(pickup_community_area = No. , area = `Area(km2)`, density = `Density(km2)`) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>%
+  inner_join(areas, by="pickup_community_area") %>%
+  inner_join(trip_total_in_area, by = "pickup_community_area") %>%
+  inner_join(income, by = "pickup_community_area") %>%
+  as.data.frame() 
+
+rownames(comm_area_joined) <- comm_area_joined$community_name
+df1 <- comm_area_joined %>% dplyr::select(trip_total, area, density, Population, per_capita_income,
+                                percent_households_below_poverty, percent_aged_under_18_or_over_64)
+
+
+
+pca_arrests = princomp(df1)
+# install.packages("remotes")
+# remotes::install_github("vqv/ggbiplot")
+# library(ggbiplot)
+p1 = ggscreeplot(pca_arrests) +
+  theme_bw(base_size = 20) + labs(y = "Prop. of explained variance")
+p2 = ggscreeplot(pca_arrests,type = "cev") + theme_bw(base_size = 20) + labs(y = " Cumulative prop. of explained variance")
+gridExtra::grid.arrange(p1, p2, ncol=2)
+
+ggbiplot(pca_arrests, labels =  rownames(df1), labels.size = 3, varname.size = 5) +
+  theme_bw(base_size = 20) + coord_cartesian(ylim = c(-2.5,2.5), xlim = c(-2.5,2.5))
+
+```
+
+```{r}
+set.seed(1)
+cl_arrests = kmeans(df1, centers = 4, nstart = 10)
+p = ggbiplot(
+  pca_arrests,
+  groups = factor(cl_arrests$cluster),
+  ellipse = TRUE) + 
+  theme_bw(base_size = 20) +
+  theme(legend.position = "none")
+p
+```
+
+
+```{r}
+library(factoextra)
+fviz_cluster(cl_arrests, data = df1) + theme_classic(base_size = 26)
+```
+
+## Load Open Street Map Data
+
+We extract amenity information including theatre, restaurant and hospital from Open Street Map Data (osmdata) package and plot it out using the same package. Due to the limit of the dataset, we cannot get all the places where people are likely to take a taxi. But we can still identify the places with most clustered orange dots are popular area for taking taxi, also they might be in the centre of Chicago. 
+
+To make it easier to compare, we plot out all roads for cars and add the zone border into the map, as well as the amenities on top of them.
+
+```{r x5, warning=FALSE}
+q1 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "theatre") %>% osmdata_sf()
+
+q2 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "restaurant") %>% osmdata_sf()
+
+q3 <- getbb("Chicago") %>%
+  opq() %>%
+  add_osm_feature("amenity", "hospital") %>% osmdata_sf()
+
+
+# str(q4) #query structure
+q_all = c (q1, q2, q3)
+```
+
+
+```{r x6, warning=FALSE}
+# available_tags("highway")
+big_streets <- getbb("Chicago")%>%
+  opq()%>%
+  add_osm_feature(key = "highway", 
+                  value = c("motorway", "primary", "motorway_link", "primary_link")) %>%
+  osmdata_sf()
+
+med_streets <- getbb("Chicago")%>%
+  opq()%>%
+  add_osm_feature(key = "highway", 
+                  value = c("secondary", "tertiary", "secondary_link", "tertiary_link")) %>%
+  osmdata_sf()
+
+a1 <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
+  clean_names() %>%
+  dplyr::select(area_numbe, community, geometry) %>%
+  mutate(geometry = st_geometry(geometry),
+         area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable
+  rename(pickup_community_area = area_numbe,
+         community_name = community) 
+
+a1_3857 <- sf::st_transform(a1, 3857)
+
+```
+
+
+```{r xx2, warning=FALSE}
+ggplot() +
+  geom_sf(data = a1) +
+  geom_sf(data = a1_3857, colour = "blue", fill = NA, alpha = .3) +
+  geom_sf(data = big_streets$osm_lines,
+          inherit.aes = FALSE,
+          color = "black",
+          size = .3,
+          alpha = .3) + 
+  geom_sf(data = med_streets$osm_lines,
+          inherit.aes = FALSE,
+          color = "#666666",
+          size = .2,
+          alpha = .3) +
+  labs(title = "Chicago", subtitle = "41.8781°N / 87.6298°W") +
+  theme_void() +
+  geom_sf(data = q_all$osm_points,inherit.aes = FALSE, colour = "orange",
+          fill = "orange",
+          alpha = .1,
+          size = 1,
+          shape = 21) 
+    theme(plot.title = element_text(size = 20, family = "lato", face="bold", hjust=.5), plot.subtitle = element_text(family = "lato", size = 8, hjust=.5, margin=margin(2, 0, 5, 0))) 
+```
+
+Now, it becomes clearer that the reason for higher revenue in certain zone might be related to the density of certain amenities.
+
+The only exception is O’Hare, where not many amenities are gathered but a hot spot for taxis. It turned out to be that O’Hare is the location of Chicago O'Hare International Airport, which explains why it attracts most of the taxis and produces such a high revenue.
+
+
+
+
+```{r Register, loading data, and extracting a random sample, echo=FALSE, warning=FALSE, include=FALSE}
+
+
+
+taxi_trips <- na.omit(taxi_trips,cols=c("trip_minutes","trip_miles","trip_total"))
+
+#Sort based on hour of the day
+taxi_trips$trip_start=(paste(substr(taxi_trips$trip_start_timestamp,12,13),
+                             substr(taxi_trips$trip_start_timestamp,21,22)))
+
+# Creating a new column with simplifies start time of trips
+taxi_trips$trip_start[taxi_trips$trip_start == "12 AM"] <- 1
+taxi_trips$trip_start[taxi_trips$trip_start == "01 AM"] <- 2
+taxi_trips$trip_start[taxi_trips$trip_start == "02 AM"] <- 3
+taxi_trips$trip_start[taxi_trips$trip_start == "03 AM"] <- 4
+taxi_trips$trip_start[taxi_trips$trip_start == "04 AM"] <- 5
+taxi_trips$trip_start[taxi_trips$trip_start == "05 AM"] <- 6
+taxi_trips$trip_start[taxi_trips$trip_start == "06 AM"] <- 7
+taxi_trips$trip_start[taxi_trips$trip_start == "07 AM"] <- 8
+taxi_trips$trip_start[taxi_trips$trip_start == "08 AM"] <- 9
+taxi_trips$trip_start[taxi_trips$trip_start == "09 AM"] <- 10
+taxi_trips$trip_start[taxi_trips$trip_start == "10 AM"] <- 11
+taxi_trips$trip_start[taxi_trips$trip_start == "11 AM"] <- 12
+taxi_trips$trip_start[taxi_trips$trip_start == "12 PM"] <- 13
+taxi_trips$trip_start[taxi_trips$trip_start == "01 PM"] <- 14
+taxi_trips$trip_start[taxi_trips$trip_start == "02 PM"] <- 15
+taxi_trips$trip_start[taxi_trips$trip_start == "03 PM"] <- 16
+taxi_trips$trip_start[taxi_trips$trip_start == "04 PM"] <- 17
+taxi_trips$trip_start[taxi_trips$trip_start == "05 PM"] <- 18
+taxi_trips$trip_start[taxi_trips$trip_start == "06 PM"] <- 19
+taxi_trips$trip_start[taxi_trips$trip_start == "07 PM"] <- 20
+taxi_trips$trip_start[taxi_trips$trip_start == "08 PM"] <- 21
+taxi_trips$trip_start[taxi_trips$trip_start == "09 PM"] <- 22
+taxi_trips$trip_start[taxi_trips$trip_start == "10 PM"] <- 23
+taxi_trips$trip_start[taxi_trips$trip_start == "11 PM"] <- 24
+
+# Rescaling trip duration in minutes and rename it
+taxi_trips$trip_seconds <- taxi_trips$trip_seconds / 60
+taxi_trips <- rename(taxi_trips, trip_minutes = trip_seconds)
+
+```
+
+
+
+
+```{r Plotting of the map, echo=FALSE, warning=FALSE, include = FALSE}
+#Get location of chicago
+chicago <- geocode("Chicago, IL")
+
+# function that creates the interactive map
+chicago_map <- function(trip_area, data_type, hour){
+  if (hour == "day") {
+    if (data_type=="trip_miles"){
+      label <- "<strong>%s</strong><br/>%g miles"
+      tit <- "Trip miles"
+      trip_area <- taxi_trips %>%
+        dplyr::select(pickup_community_area, trip_miles) %>%
+        mutate(pickup_community_area = as.factor(pickup_community_area),
+               trip_miles = (as.numeric(trip_miles))) %>%
+        group_by(pickup_community_area) %>%
+        summarise(trip_miles = sum(trip_miles))
+      plot_trip_area <- rename(trip_area, trip = trip_miles)
+    }
+    else if (data_type=="trip_minutes"){
+      label <- "<strong>%s</strong><br/>%g minutes"
+      tit <- "Trip minutes"
+      trip_area <- taxi_trips %>%
+        dplyr::select(pickup_community_area, trip_minutes) %>%
+        mutate(pickup_community_area = as.factor(pickup_community_area),
+               trip_minutes = (as.numeric(trip_minutes))) %>%
+        group_by(pickup_community_area) %>%
+        summarise(trip_minutes = sum(trip_minutes))
+      plot_trip_area <- rename(trip_area, trip = trip_minutes)
+    }
+    else {
+      label <- "<strong>%s</strong><br/>%g$ trip total"
+      tit <- "Trip total"
+      trip_area <- taxi_trips %>%
+        dplyr:: select(pickup_community_area, trip_total) %>%
+        mutate(pickup_community_area = as.factor(pickup_community_area),
+               trip_total = (as.numeric(trip_total))) %>%
+        group_by(pickup_community_area) %>%
+        summarise(trip_total = sum(trip_total))
+      plot_trip_area <- rename(trip_area, trip = trip_total)
+    }
+  } 
+  else if (data_type=="trip_miles"){
+    label <- "<strong>%s</strong><br/>%g miles"
+    tit <- "Trip miles"
+    trip_area <- taxi_trips %>%
+      dplyr::select(pickup_community_area, trip_miles, trip_start) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_miles = (as.numeric(trip_miles))) %>%
+      filter(trip_total==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_miles = sum(trip_miles))
+    plot_trip_area <- rename(trip_area, trip = trip_miles)
+  }
+  else if (data_type=="trip_minutes"){
+    label <- "<strong>%s</strong><br/>%g minutes"
+    tit <- "Trip minutes"
+    trip_area <- taxi_trips %>%
+      dplyr::select(pickup_community_area, trip_minutes, trip_start) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_minutes = (as.numeric(trip_minutes))) %>%
+      filter(trip_total==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_minutes = sum(trip_minutes))
+    plot_trip_area <- rename(trip_area, trip = trip_minutes)
+  }
+  else {
+    label <- "<strong>%s</strong><br/>%g$ trip total"
+    tit <- "Trip total"
+    trip_area <- taxi_trips %>%
+      dplyr::select(pickup_community_area, trip_total) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_total==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_total = sum(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  }
+  
+  #Make leaflet map with chicago center
+  chicago_leaflet <- leaflet() %>% 
+    setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
+    addProviderTiles(providers$CartoDB.Positron) 
+  
+  
+  #Save chicago areas to use for plotting
+  areas <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_Community_Areas_.geojson", as_tibble=T, quiet=T) %>%
+    clean_names() %>%
+    dplyr::select(area_numbe, community, geometry) %>%
+    mutate(geometry = st_geometry(geometry),
+           area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable 
+    rename(pickup_community_area = area_numbe,
+           community_name = community) %>%
+    inner_join(plot_trip_area, by="pickup_community_area")
+  
+  #Trying to color each area by trip
+  pal <- colorBin("Blues",bins=4, domain =log10(areas$trip), )
+  
+  #Generate html labels
+  labels <- sprintf(
+    label,
+    areas$community_name, areas$trip
+  ) %>% lapply(htmltools::HTML)
+  
+  chicago_leaflet <- chicago_leaflet %>%
+    addPolygons(data=areas,
+                fillColor=~pal(log10(areas$trip)),
+                color="lightgrey",
+                weight=2,
+                fillOpacity=0.8,
+                highlightOptions = highlightOptions(
+                  weight=3,
+                  opacity=2,
+                  color="azure1",
+                  bringToFront=TRUE),
+                label=labels,
+                labelOptions=labelOptions(
+                  style = list("font-weight" = "normal", padding = "3px 8px"),
+                  textsize = "15px",
+                  direction = "auto")) %>%
+    
+    addLegend("bottomright",
+              pal = pal,
+              values = log10(areas$trip),
+              title = tit,
+              opacity = 0.8,
+              labFormat = leaflet::labelFormat(
+                transform = function(x) 10^(x)))
+  
+
+  return(chicago_leaflet)
+}
+
+```
+
+
+```{r Defining the UI, echo=FALSE, warning=FALSE}
+
+# Defining the UI
+ui <- fluidPage(
+
+  sidebarPanel(
+    
+    # First input: Type of data
+    selectInput(inputId = "data_type",
+                label = "Choose the type of data you want to see:",
+                choices = list("Trip total" = "trip_total", 
+                               "Trip miles" = "trip_miles",
+                               "Trip minutes" = "trip_minutes")),
+    
+    selectInput(inputId = "time",
+                label = "Choose the time of day for which you want to see the
+                data:",
+                choices = list("All day" = "day", "12 AM" = "1", "01 AM" = "2",
+                               "02 AM" = "3", "03 AM" = "4", "04 AM" = "5",
+                               "05 AM" = "6", "06 AM" = "7", "07 AM" = "8",
+                               "08 AM" = "9", "09 AM" = "10", "10 AM" = "11",
+                               "11 AM" = "12", "12 PM" = "13", "01 PM" = "14",
+                               "02 PM" = "15", "03 PM" = "16", "04 PM" = "17",
+                               "05 PM" = "18", "06 PM" = "19", "'07 PM" = "20", 
+                               "08 PM" = "21", "09 PM" = "22", "10 PM" = "23",
+                               "11 PM" = "24")),
+    
+  ),
+  
+  # Main panel for displaying outputs
+  mainPanel(
+    
+    # Hide errors
+    tags$style(type = "text/css",
+               ".shiny-output-error { visibility: hidden; }",
+               ".shiny-output-error:before { visibility: hidden; }"),
+    
+    # Output: interactive chicago map
+    leafletOutput("map1")
+    
+  )
+)
+
+```
+
+```{r Defining the server, echo=FALSE, warning=FALSE}
+
+# Defining the server
+server = function(input, output) {
+  output$map1 <- renderLeaflet(chicago_map(trip_area,input$data_type ,input$time))
+}
+```
+
+## Animation
+```{r}
+# my_sample <- mytable
+# my_sample$trip_start=(paste(substr(my_sample$trip_start_timestamp,12,13),substr(my_sample$trip_start_timestamp,21,22)))
+# 
+# my_sample$trip_start[my_sample$trip_start == "12 AM"] <- 1
+# my_sample$trip_start[my_sample$trip_start == "01 AM"] <- 2
+# my_sample$trip_start[my_sample$trip_start == "02 AM"] <- 3
+# my_sample$trip_start[my_sample$trip_start == "03 AM"] <- 4
+# my_sample$trip_start[my_sample$trip_start == "04 AM"] <- 5
+# my_sample$trip_start[my_sample$trip_start == "05 AM"] <- 6
+# my_sample$trip_start[my_sample$trip_start == "06 AM"] <- 7
+# my_sample$trip_start[my_sample$trip_start == "07 AM"] <- 8
+# my_sample$trip_start[my_sample$trip_start == "08 AM"] <- 9
+# my_sample$trip_start[my_sample$trip_start == "09 AM"] <- 10
+# my_sample$trip_start[my_sample$trip_start == "10 AM"] <- 11
+# my_sample$trip_start[my_sample$trip_start == "11 AM"] <- 12
+# my_sample$trip_start[my_sample$trip_start == "12 PM"] <- 13
+# my_sample$trip_start[my_sample$trip_start == "01 PM"] <- 14
+# my_sample$trip_start[my_sample$trip_start == "02 PM"] <- 15
+# my_sample$trip_start[my_sample$trip_start == "03 PM"] <- 16
+# my_sample$trip_start[my_sample$trip_start == "04 PM"] <- 17
+# my_sample$trip_start[my_sample$trip_start == "05 PM"] <- 18
+# my_sample$trip_start[my_sample$trip_start == "06 PM"] <- 19
+# my_sample$trip_start[my_sample$trip_start == "07 PM"] <- 20
+# my_sample$trip_start[my_sample$trip_start == "08 PM"] <- 21
+# my_sample$trip_start[my_sample$trip_start == "09 PM"] <- 22
+# my_sample$trip_start[my_sample$trip_start == "10 PM"] <- 23
+# my_sample$trip_start[my_sample$trip_start == "11 PM"] <- 24
+
+```
+
+
+## Trip data by areas of Chicago
+
+```{r shinyApp, echo=FALSE, warning=FALSE}
+shinyApp(ui = ui, server = server)
+```
+
+
+
+```{r}
+
+```
+
+
+## Final Result
+
+```{r}
+#Preparing relevant dataset 
+# pickup_dropoff_times <- taxi_trips %>%
+#   dplyr::select(taxi_id, trip_end_timestamp, trip_start_timestamp,
+#          pickup_community_area, dropoff_community_area,
+#          trip_total, trip_seconds) %>% #for in hourly_rate estimator
+#   mutate(trip_end_timestamp = as.double(mdy_hms(trip_end_timestamp)),
+#          pickup_community_area = as.factor(pickup_community_area),
+#          dropoff_community_area = as.factor(dropoff_community_area),
+#          trip_start_timestamp = as.double(mdy_hms(trip_start_timestamp)),
+#          trip_total = as.numeric(trip_total),
+#          trip_seconds = as.numeric(trip_seconds)) %>%
+#   drop_na() %>%
+#   print()
+# 
+# dropoff_times <- pickup_dropoff_times %>% 
+#   dplyr::select(taxi_id, trip_end_timestamp, dropoff_community_area) %>%
+#   group_by(taxi_id) %>%
+#   arrange(trip_end_timestamp, .by_group=TRUE) %>%
+#   filter(row_number() != n()) %>%
+#   print()
+# 
+# pickup_times <- pickup_dropoff_times %>%
+#   dplyr::select(taxi_id, trip_start_timestamp, pickup_community_area,
+#          trip_total, trip_seconds) %>% 
+#   group_by(taxi_id) %>%
+#   arrange(trip_start_timestamp, .by_group=TRUE) %>%
+#   filter(row_number() != 1) %>%
+#   print()
+#   
+# #Dataset used as basis for plotting bost avg time to pickup in each area and
+# #our expected hourly rate
+# dropoff_to_pickup <- pickup_times %>%
+#   add_column(trip_end_timestamp = dropoff_times$trip_end_timestamp, .after=1) %>%
+#   add_column(dropoff_community_area = dropoff_times$dropoff_community_area, .after=5) %>%
+#   print()
+# 
+# time_to_pickup <- dropoff_to_pickup %>%
+#   mutate(time_between = (trip_start_timestamp - trip_end_timestamp)/60) %>%
+#   filter(pickup_community_area == dropoff_community_area) %>%
+#   dplyr::select(pickup_community_area, time_between) %>% 
+#   group_by(pickup_community_area) %>%
+#   filter(time_between < 300) %>% 
+#   summarise(avg_pickup_time = mean(time_between, na.rm=TRUE)) %>%
+#   print()
+#   
+# areas_pickup_time <- areas %>%
+#   inner_join(time_to_pickup, by="pickup_community_area") %>%
+#   mutate(avg_pickup_time=as.integer(avg_pickup_time)) %>%
+#   print()
+# 
+# time_pal <- colorBin("OrRd", domain=areas_pickup_time$avg_pickup_time, bins=c(0, 6, 12, 18, 24, 30), 
+#                 reverse=TRUE, na.color='floralwhite')
+# 
+# #Generate html labels
+# label_avg_pickup_time <- sprintf(
+#   "<strong>%s</strong><br/>Average time from dropoff to new pickup:<br/>%g minutes",
+#   areas_pickup_time$community_name, areas_pickup_time$avg_pickup_time
+# ) %>% lapply(htmltools::HTML)
+# 
+# 
+# #Labels for the legend
+# waiting_time_labels<-c('< 6 minutes', '6 - 12 minutes', '12 - 18 minutes', '18 - 24 minutes', 
+#          '> 24 minutes')
+# #Make the map
+# chicago_leaflet %>%
+#   addPolygons(data=areas_pickup_time,
+#               fillColor=~time_pal(areas_pickup_time$avg_pickup_time),
+#               color="lightgrey",
+#               weight=2,
+#               fillOpacity=0.8,
+#               highlightOptions = highlightOptions(
+#                 weight=3,
+#                 opacity=2,
+#                 color="azure1",
+#                 bringToFront=TRUE),
+#               label=label_avg_pickup_time,
+#               labelOptions=labelOptions(
+#                 style = list("font-weight" = "normal", padding = "3px 8px"),
+#                 textsize = "15px",
+#                 direction = "auto")) %>%
+#   
+#   addLegend("bottomright",
+#             pal = time_pal,
+#             labFormat = function(type, cuts, p) {  # To get custom labels
+#               paste0(waiting_time_labels)
+#             },
+#             values = areas_pickup_time$avg_pickup_time,
+#             title = "Average time between pickup and dropoff",
+#             opacity = 0.8)
+
+```
+```{r}
+
+```
+
+
+
