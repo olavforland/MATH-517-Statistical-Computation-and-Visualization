@@ -1,0 +1,368 @@
+---
+title: "Basic exploration of area for each time of the day"
+author: "Thomas"
+date: "10/19/2021"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r loading package, echo=FALSE, warning=FALSE, include=FALSE}
+pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, shiny)
+```
+
+```{r Register API key to google, echo=FALSE, warning=FALSE, include = FALSE}
+#Register API key to google
+register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+taxi_trips<-read_csv("Taxi_Trips_-_2020.csv") %>%
+  clean_names()
+
+taxi_trips <- na.omit(taxi_trips,cols=c("trip_total"))
+
+#Sort based on hour of the day
+taxi_trips$trip_start=(paste(substr(taxi_trips$trip_start_timestamp,12,13),
+                             substr(taxi_trips$trip_start_timestamp,21,22)))
+
+# Creating a new column with simplifies start time of trips
+taxi_trips$trip_start[taxi_trips$trip_start == "12 AM"] <- 1
+taxi_trips$trip_start[taxi_trips$trip_start == "01 AM"] <- 2
+taxi_trips$trip_start[taxi_trips$trip_start == "02 AM"] <- 3
+taxi_trips$trip_start[taxi_trips$trip_start == "03 AM"] <- 4
+taxi_trips$trip_start[taxi_trips$trip_start == "04 AM"] <- 5
+taxi_trips$trip_start[taxi_trips$trip_start == "05 AM"] <- 6
+taxi_trips$trip_start[taxi_trips$trip_start == "06 AM"] <- 7
+taxi_trips$trip_start[taxi_trips$trip_start == "07 AM"] <- 8
+taxi_trips$trip_start[taxi_trips$trip_start == "08 AM"] <- 9
+taxi_trips$trip_start[taxi_trips$trip_start == "09 AM"] <- 10
+taxi_trips$trip_start[taxi_trips$trip_start == "10 AM"] <- 11
+taxi_trips$trip_start[taxi_trips$trip_start == "11 AM"] <- 12
+taxi_trips$trip_start[taxi_trips$trip_start == "12 PM"] <- 13
+taxi_trips$trip_start[taxi_trips$trip_start == "01 PM"] <- 14
+taxi_trips$trip_start[taxi_trips$trip_start == "02 PM"] <- 15
+taxi_trips$trip_start[taxi_trips$trip_start == "03 PM"] <- 16
+taxi_trips$trip_start[taxi_trips$trip_start == "04 PM"] <- 17
+taxi_trips$trip_start[taxi_trips$trip_start == "05 PM"] <- 18
+taxi_trips$trip_start[taxi_trips$trip_start == "06 PM"] <- 19
+taxi_trips$trip_start[taxi_trips$trip_start == "07 PM"] <- 20
+taxi_trips$trip_start[taxi_trips$trip_start == "08 PM"] <- 21
+taxi_trips$trip_start[taxi_trips$trip_start == "09 PM"] <- 22
+taxi_trips$trip_start[taxi_trips$trip_start == "10 PM"] <- 23
+taxi_trips$trip_start[taxi_trips$trip_start == "11 PM"] <- 24
+
+#Sort based on hour of the day for end
+taxi_trips$trip_end=(paste(substr(taxi_trips$trip_end_timestamp,12,13),
+                             substr(taxi_trips$trip_end_timestamp,21,22)))
+
+# Creating a new column with simplifies end time of trips
+taxi_trips$trip_end[taxi_trips$trip_end == "12 AM"] <- 1
+taxi_trips$trip_end[taxi_trips$trip_end == "01 AM"] <- 2
+taxi_trips$trip_end[taxi_trips$trip_end == "02 AM"] <- 3
+taxi_trips$trip_end[taxi_trips$trip_end == "03 AM"] <- 4
+taxi_trips$trip_end[taxi_trips$trip_end == "04 AM"] <- 5
+taxi_trips$trip_end[taxi_trips$trip_end == "05 AM"] <- 6
+taxi_trips$trip_end[taxi_trips$trip_end == "06 AM"] <- 7
+taxi_trips$trip_end[taxi_trips$trip_end == "07 AM"] <- 8
+taxi_trips$trip_end[taxi_trips$trip_end == "08 AM"] <- 9
+taxi_trips$trip_end[taxi_trips$trip_end == "09 AM"] <- 10
+taxi_trips$trip_end[taxi_trips$trip_end == "10 AM"] <- 11
+taxi_trips$trip_end[taxi_trips$trip_end == "11 AM"] <- 12
+taxi_trips$trip_end[taxi_trips$trip_end == "12 PM"] <- 13
+taxi_trips$trip_end[taxi_trips$trip_end == "01 PM"] <- 14
+taxi_trips$trip_end[taxi_trips$trip_end == "02 PM"] <- 15
+taxi_trips$trip_end[taxi_trips$trip_end == "03 PM"] <- 16
+taxi_trips$trip_end[taxi_trips$trip_end == "04 PM"] <- 17
+taxi_trips$trip_end[taxi_trips$trip_end == "05 PM"] <- 18
+taxi_trips$trip_end[taxi_trips$trip_end == "06 PM"] <- 19
+taxi_trips$trip_end[taxi_trips$trip_end == "07 PM"] <- 20
+taxi_trips$trip_end[taxi_trips$trip_end == "08 PM"] <- 21
+taxi_trips$trip_end[taxi_trips$trip_end == "09 PM"] <- 22
+taxi_trips$trip_end[taxi_trips$trip_end == "10 PM"] <- 23
+taxi_trips$trip_end[taxi_trips$trip_end == "11 PM"] <- 24
+
+
+taxi_thomas <- select(taxi_trips,
+                      c("trip_id","taxi_id","pickup_community_area","dropoff_community_area",
+                                   "trip_total","trip_start","trip_end"))
+taxi_thomas <- filter(taxi_thomas, trip_total > 1)
+rm(taxi_trips)
+```
+
+```{r Making the map, echo=FALSE, warning=FALSE, include = FALSE}
+chicago_map_pick <- function(trip_area, data_type, hour){
+  if (data_type == "max" | data_type == "sum"){
+    scale_function <- function(x) 10^(x)
+  } else if (data_type == "mean"){
+    scale_function <- function(x) 2^(x)
+  }
+  if (data_type == "mean"){
+    trip_area <- taxi_thomas %>%
+      select(pickup_community_area, trip_total, trip_start) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_total = mean(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  } else if (data_type == "max"){
+    trip_area <- taxi_thomas %>%
+      select(pickup_community_area, trip_total, trip_start) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_total = max(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  } else {
+    trip_area <- taxi_thomas %>%
+      select(pickup_community_area, trip_total, trip_start) %>%
+      mutate(pickup_community_area = as.factor(pickup_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(pickup_community_area) %>%
+      summarise(trip_total = sum(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  }
+  
+  #Make leaflet map with chicago center
+  chicago_leaflet <- leaflet() %>% 
+    setView(lng=-87.6298, lat=41.87811, zoom=10) %>%
+    addProviderTiles(providers$CartoDB.Positron) 
+  
+  
+  #Save chicago areas to use for plotting
+  areas <- st_read("chicago_Community_Areas_.geojson", as_tibble=T, quiet=T) %>%
+    clean_names() %>%
+    select(area_numbe, community, geometry) %>%
+    mutate(geometry = st_geometry(geometry),
+           area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable 
+    rename(pickup_community_area = area_numbe,
+           community_name = community) %>%
+    inner_join(plot_trip_area, by="pickup_community_area")
+  
+  if (data_type == "max" | data_type == "sum"){
+    scale_selection <- log10(areas$trip)
+  } else {
+    scale_selection <- log2(areas$trip)
+  }
+  
+  #Trying to color each area by trip
+  pal <- colorBin("Blues",bins=4, domain =scale_selection, )
+  
+  #Generate html labels
+  labels <- sprintf(
+    "<strong>%s</strong><br/>%g$ trip total",
+    areas$community_name, areas$trip
+  ) %>% lapply(htmltools::HTML)
+  
+  chicago_leaflet <- chicago_leaflet %>%
+    addPolygons(data=areas,
+                fillColor=~pal(scale_selection),
+                color="lightgrey",
+                weight=2,
+                fillOpacity=0.8,
+                highlightOptions = highlightOptions(
+                  weight=3,
+                  opacity=2,
+                  color="azure1",
+                  bringToFront=TRUE),
+                label=labels,
+                labelOptions=labelOptions(
+                  style = list("font-weight" = "normal", padding = "3px 8px"),
+                  textsize = "15px",
+                  direction = "auto")) %>%
+    
+    addLegend("bottomright",
+              pal = pal,
+              values = scale_selection,
+              title = "Trip total",
+              opacity = 0.8,
+              labFormat = leaflet::labelFormat(
+                transform = scale_function))
+  
+  
+  return(chicago_leaflet)
+}
+```
+
+
+```{r Defining the UI, echo=FALSE, warning=FALSE}
+
+# Defining the UI
+ui <- fluidPage(
+  
+  sidebarPanel(
+    
+    # First input: Type of data
+    selectInput(inputId = "data_type",
+                label = "Choose the type of data you want to see:",
+                choices = list("Sum" = "sum", "Mean" = "mean", "Max" = "max")),
+    
+      sliderInput(inputId = "time",
+                  label = "Choose the time of day for which you want to see the
+                        data:",
+                  min = 1,
+                  max = 24,
+                  value = 1)
+  ),
+  
+  # Main panel for displaying outputs
+  mainPanel(
+    
+    # Hide errors
+    tags$style(type = "text/css",
+               ".shiny-output-error { visibility: hidden; }",
+               ".shiny-output-error:before { visibility: hidden; }"),
+    
+    # Output: interactive chicago map
+    leafletOutput("map1")
+    
+  )
+)
+
+```
+
+```{r Defining the server, echo=FALSE, warning=FALSE}
+
+# Defining the server
+server = function(input, output) {
+  output$map1 <- renderLeaflet(chicago_map_pick(trip_area,input$data_type,input$time))
+}
+```
+
+# Trip data by pickup areas of Chicago
+
+In this section we will comment an interactive map of Chicago that displays the _sum_, _mean_ and _max_ for the time of the day we want from 1 A.M. to 12 A.M. for each pickup areas of the city.
+
+```{r shinyApp, echo=FALSE, warning=FALSE}
+shinyApp(ui = ui, server = server)
+```
+
+For the summation of the revenue per area, we see that for most of the time it is the city center (_Near West Side_, _Loop_ and _Near North Side_) and the airports (_O'Hare_ and _Garfield Ridge_) that have higher values, except during the night for which the values go down for the airports. This could be due to the fact that there is less flights coming to and going from airports at night. For the city center, it should be due to the fact that in every city there is more activity in the center of it.
+
+For the mean of the revenue per area, we can see that it is quite homogeneous on the border of Michigan Lake. But airports are the areas with some of the higher mean, as before, during the day.
+
+For the max of the revenue per area, we see that the maximal value attained for each time of the day comes from city center, particularly from _Near North Side_ and _Loop_, values that are more than 5000$ most of the time. This could be due to the fact that people that pick a taxi from the city center have a long journey to do.
+
+```{r Making the map for dropoff, echo=FALSE, warning=FALSE, include = FALSE}
+chicago_map_drop <- function(trip_area, data_type, hour){
+  if (data_type == "max" | data_type == "sum"){
+    scale_function <- function(x) 10^(x)
+  } else if (data_type == "mean"){
+    scale_function <- function(x) 2^(x)
+  }
+  if (data_type == "mean"){
+    trip_area <- taxi_thomas %>%
+      select(dropoff_community_area, trip_total, trip_start) %>%
+      mutate(dropoff_community_area = as.factor(dropoff_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(dropoff_community_area) %>%
+      summarise(trip_total = mean(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  } else if (data_type == "max"){
+    trip_area <- taxi_thomas %>%
+      select(dropoff_community_area, trip_total, trip_start) %>%
+      mutate(dropoff_community_area = as.factor(dropoff_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(dropoff_community_area) %>%
+      summarise(trip_total = max(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  } else {
+    trip_area <- taxi_thomas %>%
+      select(dropoff_community_area, trip_total, trip_start) %>%
+      mutate(dropoff_community_area = as.factor(dropoff_community_area),
+             trip_total = (as.numeric(trip_total))) %>%
+      filter(trip_start==as.numeric(hour)) %>%
+      group_by(dropoff_community_area) %>%
+      summarise(trip_total = sum(trip_total))
+    plot_trip_area <- rename(trip_area, trip = trip_total)
+  }
+  
+  #Make leaflet map with chicago center
+  chicago_leaflet <- leaflet() %>% 
+    setView(lng=-87.6298, lat=41.87811, zoom=10) %>%
+    addProviderTiles(providers$CartoDB.Positron) 
+  
+  
+  #Save chicago areas to use for plotting
+  areas <- st_read("chicago_Community_Areas_.geojson", as_tibble=T, quiet=T) %>%
+    clean_names() %>%
+    select(area_numbe, community, geometry) %>%
+    mutate(geometry = st_geometry(geometry),
+           area_numbe = as.factor(area_numbe)) %>% #if this stops working extract it to own variable 
+    rename(dropoff_community_area = area_numbe,
+           community_name = community) %>%
+    inner_join(plot_trip_area, by="dropoff_community_area")
+  
+  if (data_type == "max" | data_type == "sum"){
+    scale_selection <- log10(areas$trip)
+  } else {
+    scale_selection <- log2(areas$trip)
+  }
+  
+  #Trying to color each area by trip
+  pal <- colorBin("Blues",bins=4, domain =scale_selection, )
+  
+  #Generate html labels
+  labels <- sprintf(
+    "<strong>%s</strong><br/>%g$ trip total",
+    areas$community_name, areas$trip
+  ) %>% lapply(htmltools::HTML)
+  
+  chicago_leaflet <- chicago_leaflet %>%
+    addPolygons(data=areas,
+                fillColor=~pal(scale_selection),
+                color="lightgrey",
+                weight=2,
+                fillOpacity=0.8,
+                highlightOptions = highlightOptions(
+                  weight=3,
+                  opacity=2,
+                  color="azure1",
+                  bringToFront=TRUE),
+                label=labels,
+                labelOptions=labelOptions(
+                  style = list("font-weight" = "normal", padding = "3px 8px"),
+                  textsize = "15px",
+                  direction = "auto")) %>%
+    
+    addLegend("bottomright",
+              pal = pal,
+              values = scale_selection,
+              title = "Trip total",
+              opacity = 0.8,
+              labFormat = leaflet::labelFormat(
+                transform = scale_function))
+  
+  
+  return(chicago_leaflet)
+}
+```
+
+```{r Defining the server2, echo=FALSE, warning=FALSE}
+
+# Defining the server
+server2 = function(input, output) {
+  output$map1 <- renderLeaflet(chicago_map_drop(trip_area,input$data_type,input$time))
+}
+```
+
+# Trip data by drop-off areas of Chicago
+
+This section is similar to the previous one, but instead of looking at pickup areas, we look at drop-off areas and end time of each trip. As before, we can take a look at each hour of the day from 1 A.M. to 12 A.M.
+
+```{r shinyApp2, echo=FALSE, warning=FALSE}
+shinyApp(ui = ui, server = server2)
+```
+
+For the summation part, we can see quit the same as for the pickup map but the highest values are less concentrated in the city center and more scattered around it. We have the same conclusion for the airports.
+
+For the mean case, the values are a lot more homogeneous than for pickups and dispersed over all the city.
+
+For the maximal values, we see that the higher values appearing are from the city center to _Lake View_, an area in the north. As before, airports have high values.
+
+To conclude, this was a brief analyze of the basis data in order to have an idea of the situation for both pickup and drop-off. We see that it would be better to analyze deeper the pickup case if we wish to answer our questions.

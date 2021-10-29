@@ -1,4 +1,5 @@
 ---
+
 title: 'Report'
 author: "SCV Group"
 date: "`r format(Sys.time(), '%a %b %d %Y')`"
@@ -22,7 +23,6 @@ We have two questions to be answered:
 ```{r}
 # load("/Users/yirencao/Documents/GitHub/SCV/code/work1.RData")
 ```
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -58,8 +58,6 @@ First of all, we do the basic analysis on the dataset and look at each variable.
 sample_gally <- my_sample %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
 GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
 ```
-
-
 
 
 To further visualise the variable trip_total which is of our main interest, we use a geom_histogram in ggplot2 and carefully select the binwidth.
@@ -101,6 +99,7 @@ pickup_zone %>%
 
 Further, we prefer using median over mean because the distribution of revenue is skewed.
 
+
 ```{r, fig.width=10, fig.height=8}
 top5 <- pickup_zone %>%
   group_by(pickup_community_area) %>% 
@@ -115,6 +114,7 @@ sample_gally %>% group_by(pickup_community_area) %>% count()
                                                                               
 GGally::ggpairs(sample_gally,  mapping = aes(col = pickup_community_area), cardinality_threshold=NULL) + theme_bw(base_size = 22)
 ```
+
 
 As for the dropoff area, it is obvious that zone 76 produced most revenue. 
 ```{r x2, warning=FALSE}
@@ -143,6 +143,7 @@ After looking at the revenue map, we wonder why some of places generate more rev
 
 ## Total Revenue
 ```{r x3, warning=FALSE}
+
 trip_total_in_area <- mytable %>%
   dplyr::select(pickup_community_area, trip_total) %>%
   mutate(pickup_community_area = as.factor(pickup_community_area)) %>%
@@ -150,10 +151,11 @@ trip_total_in_area <- mytable %>%
   drop_na() %>%
   summarise(trip_total = sum(trip_total)) # error???
 
+
 #Get location of chicago
 chicago <- geocode("Chicago, IL")
 
-#Make leaflet map with chicago center
+
 chicago_leaflet <- leaflet() %>%
   setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
   addProviderTiles(providers$CartoDB.Positron)
@@ -214,13 +216,12 @@ We think population might be one of the main factors that affects the total aven
 
 We apply logarithmic function on population to make the map more sensible. After comparing the two maps, we think the population might be one of the exploratory variables to the total revenue.
 
+
 ```{r}
 # comm_area %>% 
 #   dplyr::select(No., Population, `Area(km2)`, `Density(km2)`) %>% 
 #   dplyr::rename(pickup_community_area = No. )
 ```
-
-
 ```{r x4, warning=FALSE}
 comm_area = read_csv("/Users/yirencao/Documents/GitHub/SCV/code/data/mywiki.csv")
 comm_area_1 = comm_area %>% 
@@ -228,8 +229,6 @@ comm_area_1 = comm_area %>%
   rename(pickup_community_area = No.) %>%
   mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
   mutate(pickup_community_area = as.factor(pickup_community_area)) 
-
-
 
 ## modified olav's codes
 areas <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_areas.shp", as_tibble=T, quiet=T) %>%
@@ -264,10 +263,12 @@ chicago <- geocode("Chicago, IL")
 chicago_leaflet <- leaflet() %>% 
   setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
   addProviderTiles(providers$CartoDB.Positron) 
+
 ```
 
 
 ```{r xx1, warning=FALSE}
+
 #Make the map
 chicago_leaflet %>%
   addPolygons(data=areas,
@@ -295,6 +296,7 @@ chicago_leaflet %>%
               transform = function(x) round(2^(x))))
 
 ```
+
 
 ## PCA
 ```{r}
@@ -351,6 +353,7 @@ library(factoextra)
 fviz_cluster(cl_arrests, data = df1) + theme_classic(base_size = 26)
 ```
 
+
 ## Load Open Street Map Data
 
 We extract amenity information including theatre, restaurant and hospital from Open Street Map Data (osmdata) package and plot it out using the same package. Due to the limit of the dataset, we cannot get all the places where people are likely to take a taxi. But we can still identify the places with most clustered orange dots are popular area for taking taxi, also they might be in the centre of Chicago. 
@@ -400,10 +403,12 @@ a1 <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_
 
 a1_3857 <- sf::st_transform(a1, 3857)
 
+
 ```
 
 
 ```{r xx2, warning=FALSE}
+
 ggplot() +
   geom_sf(data = a1) +
   geom_sf(data = a1_3857, colour = "blue", fill = NA, alpha = .3) +
@@ -708,6 +713,7 @@ shinyApp(ui = ui, server = server)
 
 
 
+
 ```{r}
 
 ```
@@ -719,6 +725,7 @@ shinyApp(ui = ui, server = server)
 #Preparing relevant dataset 
 # pickup_dropoff_times <- taxi_trips %>%
 #   dplyr::select(taxi_id, trip_end_timestamp, trip_start_timestamp,
+
 #          pickup_community_area, dropoff_community_area,
 #          trip_total, trip_seconds) %>% #for in hourly_rate estimator
 #   mutate(trip_end_timestamp = as.double(mdy_hms(trip_end_timestamp)),
@@ -807,9 +814,7 @@ shinyApp(ui = ui, server = server)
 #             opacity = 0.8)
 
 ```
-```{r}
 
-```
 
 
 
