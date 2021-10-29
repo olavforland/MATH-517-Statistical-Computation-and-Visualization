@@ -1,37 +1,44 @@
 ---
-title: "An investegation into the profitability of Chicago taxis"
+title: |
+  ![An investegation into the profitability of Chicago taxis](../data/taxi_logo.png){width=1in}
+author: Olav Førland
+fontfamily: "accanthis"
 output: 
   html_document:
     code_folding: hide
+  pdf_document:
+    extra_dependencies: ["bbm", "threeparttable"]
+    latex_engine: xelatex
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, lubridate)
+pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, 
+              lubridate, boot, broom, tinytex)
 
 #Register API key to google
 register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
 
 load("../workspaces/olav_workspace.RData")
+#shiny::addResourcePath(prefix='leaflet-providers-1.9.0.js',
+#                      directoryPath='/var/folders/dk/wgq6cctx7jl238q904f6z1600000gn/T//Rtmp1hi7aZ')
+#i think last part is unique for each computer, i solved it by entering the directory /T through terminal
+#finding the prefix file, and making a new directory with the name addResourcePath is searching for
 
 ```
 
 
+To visualize the and highlight the differences between each area we have used interactive maps provided by the leaflet library. We used [this](https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Community-Areas-current-/cauq-8yn6) dataset provided by Chicago Data Portal to visualize the borders between community areas. We attribute a color to each area, which indicates the size of the difference relative to the other areas. Our goal was to get a clear understanding of how area and time of the day affects revenue in each area, and being able to communicate these findings as clearly as possible. 
+
+As a basis for this analysis we have plotted a map centered around Chicago. This was done by using the Leaflet library to extract a map over Chicago through Google’s map API. Thereafter we extracted `pickup_community_area`, `community_name` and `geometry` from the dataset of community borders. `pickup_community_area` is a discrete numerical variable uniquely identifying each area and community_name is a string variable which contains its corresponding name. geometry is a MultiPolygon object, which essentially is a list of coordinates representing the borders of each area. 
 
 
+We will first look into how total revenue is distributed among the areas. The relevant variables we will use are `pickup_community_area` and `trip_total`. `pickup_community_area` is identical to its corresponding variable in the area dataset. trip_total is a continuous numeric variable representing the entire cost of the taxi trip for the passenger. To indicate the total revenue in each area, we summarized every trip_total in each area. We then colored the areas in shades of blue representing the size of their respective revenues.  
+Since the revenue differences between areas often vary by several orders of magnitude, we made the bins logarithmic. We must then interpret the coloring as an indication of the order of magnitude of the revenue, not the exact revenue.   
 
 
-
-To visualize the and highlight the differences between each area we have used interactive maps provided by the leaflet library. We used this dataset (https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Community-Areas-current-/cauq-8yn6) provided by Chicago Data Portal to visualize the borders between community areas. The differences are highlighted by attributing a color to each area, which indicates the size of the difference relative to the other areas. Our goal was to get a clear understanding of how area and time of the day affects revenue in each area, and being able to communicate these findings as clear as possible. 
-
-As a basis for this analysis we have plotted a map centered around Chicago. This was done by using the Leaflet library to extract a map over Chicago through Google’s map API. Thereafter we extracted pickup_community_area, community_name and geometry from the dataset of community borders. pickup_community_area is a discrete variable uniquely identifying each area and community_name is a string variable which contains its corresponding name. geometry is a Polygon(?) data type which essentially is a list of coordinates representing the borders of each area. 
-
-
-We will first look into how total revenue is distributed among the areas. The relevant variables we will use are pickup_community_area and trip_total. pickup_community_area is identical to its corresponding variable in the area dataset. trip_total is a continuous numeric variable (?) representing the entire cost of the taxi trip for the passenger. We summarized over all trip_total for each area, and colored each area by the result. 
-Since there are great differences in revenue between the areas we made the bins on a logarithmic scale. Because revenue between areas often vary by several orders of magnitude, the logarithmic scale gives a meaningful overview without concealing important information. 
-
-
+#### Total Revenue by Area
 ```{r Plot trip total map, echo=TRUE}
 #Make the map
 chicago_leaflet %>%
@@ -60,14 +67,16 @@ chicago_leaflet %>%
               transform = function(x) 10^(x)))
 ```
 
-From the map it is clear that a few areas generate a disproportionate amount of the revenue. Does this imply that these are the most desired areas for each driver to be in? Not necesarrily. For each area there are several factors which vary; population, movement, amounts of taxis, etc. This means that although an area generates the most money overall, it’s not necessarily the same area which will earn the individual taxi driver the most money. 
 
+From the map it is clear that a few areas generate a disproportionate amount of the revenue, with Loop, O'Hare and Near West Side being the most prominent. Does this imply that every driver should strive to spend as much time as possible in these areas?
 
-To not get muddled by these hidden factors in total revenue, we can take a different approach. We will look at the average  time from a taxi drops someone off in an area, until the same taxi picks someone else up in the same area. We will only consider pickups and drop-offs which happen in the same area. This is because taxis which travel from one area to another between drop-off and pickup will inflate the average time. This could potentially lead to the central areas getting higher averages, as taxi drivers are inclined to travel back to the city center after a drop-off. 
+Not necessarily. The total revenue depends on several factors which differ between areas. For each area there are e.g. differences in population, movement of people and number of active taxis. Although an area generates the most money overall, it doesn't necessarily imply that each taxi driver is better off in that area. Just think of the large queues of taxis which are normal to see at airports - not exactly time efficient! 
 
-We extract taxi_id, trip_start_timestamp, trip_end_timestamp, pickup_community_area and dropoff_community_area from our dataset. taxi_id is an unique string identifier for each taxi and pickup_community_area and dropoff_community_area are identical to the previous description of pickup_community_area. trip_start_timestamp and trip_end_timestamp are date strings one the format “MM/DD/YYYY hh:mm:ss”, which indicates time of trip start and end.  We should note that the timestamps has been rounded to nearest 15 minute for privacy purposes. Therefore the result will not be 100% accurate, but it will give a good estimate of the true time to pickup. The results can be seen below.
+If we start by neglecting the variations of average trip time and revenue between areas, the average waiting time in each area will be a fairly good representation of how attractive the area is for each individual driver; as the drivers only earn money when having a passenger. We represent the average waiting time as the average time it takes from a taxi drops someone off in an area, until the same taxi picks someone else up in the same area. We  only consider pick-ups and drop-offs which happen in the same area. This is because taxis which travel from one area to another in between drop-off and pick-up will inflate the average time. This could potentially lead to the central areas getting higher averages, as taxi drivers are inclined to travel back to the city center after a drop-off. 
 
+We extract `taxi_id`, `trip_start_timestamp`, `trip_end_timestamp`, `pickup_community_area` and `dropoff_community_area` from our data set. `taxi_id` is an unique string identifier for each taxi and `pickup_community_area` and `dropoff_community_area` are identical to the previous description of `pickup_community_area`. `trip_start_timestamp` and `trip_end_time` stamp are date strings one the format **MM/DD/YYYY hh:mm:ss**, which indicates time of trip start and end. We note that the time stamps has been rounded to nearest 15 minute for privacy purposes. Therefore the result will not be 100% accurate, but it will give a good estimate of the true time to pickup. The results are shown below.  
 
+#### Average waiting time by area
 ```{r Plot waiting time map, include=TRUE, warning=FALSE, echo=TRUE}
 
 chicago_leaflet %>%
@@ -98,15 +107,30 @@ chicago_leaflet %>%
 
 ```
 
-When considering optimal areas for each individual taxi driver, the plots paint a fairly different picture. The revenue plot and activity plot both point towards the areas around Loop as generating the most money. This is considered the center of downtown. In addition O’Hare, the airport of Chicago, is one of the top earners. When plotting the waiting time, however, it is clear that these taxis in these areas also are more prone to waiting time – with O’Hare averaging 95 minutes in waiting time. 
+
+By considering average waiting time we get a fairly different picture. The revenue and activity plot previously pointed towards O'Hare and the central areas around Loop as the most attractive - or at least as generating the most money. We can now see that the taxis in these areas are more prone to waiting time, with O’Hare averaging 95 minutes between trips. This is probably an indication of higher competition. 
+
+However, none of these plots paint the whole picture on its own. Although the waiting time at O’Hare airport is large, a trip from the airport to the city center would generate much more revenue  than a trip from Loop to West Town. To take this into account we will go back to the factors we previously neglected; average trip total and average trip time. When combining these our goal is to get a measure of \textit{expected} revenue per hour. 
+
+We can decompose revenue per hour into: 
+
+\begin{align} 
+\textit{revenue per hour} = \frac{\textit{revenue per trip}}{\textit{time per trip}}
+\end{align}
+
+We will further view the time per trip as not only the length of the trip, but the sum of trip time and waiting time. We then obtain:
+
+\begin{align}
+\textit{revenue per hour} = \frac{\textit{revenue per trip}}{\textit{waiting time + trip time}}
+\end{align}
+
+To obtain the expected revenue per hour for each area, we simply calculate the average of the three components by area and combine them. To measure the accuracy of our estimator we used the library boot to generate 1000 random samples from each area, and calculate the average hourly rate. Since the function boot.ci didn't work on the data set, we extracted a 95% confidence interval by sorting the sampled values in each area, and taking the 25th and 975th largest values. The obtained result and code for bootstrapping can be viewed below.  
 
 
 
-None of these plots paint the whole picture on its own. Although the waiting time at O’Hare airport is large, a trip from the airport to the city center would generate much more revenue  than a trip from Loop to West Town. To take these differences into account, we will combine three factors which will make a measure for expected hourly salary in each area. 
-Our expected salary is  made up of two main components: expected income and expected time spent: (expected income / expected time). Expected time spent will further be divided into expected waiting time and expected trip time. These estimators(maybe not call them this) are obtained by averaging over our dataset in similar fashion as done earlier. The distribution for each area is shown below: (if we bootstrap, mention it here)
-
-
+#### Expected Hourly Revenue by Area
 ```{r Plot hourly salary, include=TRUE, warning=FALSE, echo=TRUE}
+
 
 chicago_leaflet %>%
   addPolygons(data=areas_hourly_rate,
@@ -135,51 +159,61 @@ chicago_leaflet %>%
             opacity = 0.8)
 
 ```
+<em>95% confidence interval is shown when hovering over an area</em>
 
-This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+##### Code used to generate confidence intervals by bootstrap method:
+```{r Bootstrapping, include=TRUE, warning=FALSE, echo=TRUE, eval=FALSE}
+bootstrap_hourly_rate <- dropoff_to_pickup %>%
+  mutate(waiting_time = (trip_start_timestamp - trip_end_timestamp)/60,
+         trip_time = trip_seconds/60) %>%
+  filter(pickup_community_area == dropoff_community_area) %>%
+  filter(waiting_time < 300) %>%##remove outliers which indicate end of workday
+  ungroup() %>%
+  select(pickup_community_area, waiting_time, trip_total, trip_time) %>%
+  group_by(pickup_community_area) %>%
+  arrange(pickup_community_area)
 
-To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
 
-## Inputs and Outputs
-
-You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
-
-```{r eruptions, echo=FALSE}
-inputPanel(
-  selectInput("n_breaks", label = "Number of bins:",
-              choices = c(10, 20, 35, 50), selected = 20),
+boot_hourly_rate <- function(data, indices) {
+  d <- data[indices,] %>% #allows boot to extract sample
+    group_by(pickup_community_area) %>%
+    summarise(avg_trip_total = mean(trip_total), 
+              avg_trip_seconds = mean(trip_time),
+              waiting_time = mean(waiting_time)) %>%
+    mutate(hourly_rate = 60*avg_trip_total / (waiting_time + avg_trip_seconds))
   
-  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
-              min = 0.2, max = 2, value = 1, step = 0.2)
+  d$hourly_rate
+}
+
+res <- boot(data=bootstrap_hourly_rate, statistic=boot_hourly_rate, R=100)
+
+conf_int <- tibble(
+  lower_bound = numeric(),
+  upper_bound = numeric()
 )
 
-renderPlot({
-  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
-       xlab = "Duration (minutes)", main = "Geyser eruption duration")
-  
-  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
-  lines(dens, col = "blue")
-})
+hourly_rate_boots <- as_tibble(res$t)
+
+for (col in hourly_rate_boots) {
+  len <- length(col)
+  indices = as.integer(c(len*0.025 + 1, len*0.975 + 1))
+  vals <- c(sort(col, partial=indices[1])[indices[1]],
+            sort(col, partial=indices[2])[indices[2]])
+  conf_int <- conf_int %>% add_row(lower_bound = vals[1], upper_bound = vals[2])
+}
+
+areas_hourly_rate <- areas %>%
+  inner_join(avg_hourly_rate, by="pickup_community_area") %>%
+  mutate(hourly_rate=as.integer(hourly_rate)) %>%
+  print()
+
+areas_hourly_rate <- areas_hourly_rate %>%
+  arrange(pickup_community_area) %>%
+  add_column(lower_bound = conf_int$lower_bound, upper_bound = conf_int$upper_bound) %>%
+  mutate(hourly_rate = (lower_bound + upper_bound) / 2) 
 ```
 
-## Embedded Application
 
-It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
-
-```{r tabsets, echo=FALSE}
-shinyAppDir(
-  system.file("examples/06_tabsets", package = "shiny"),
-  options = list(
-    width = "100%", height = 550
-  )
-)
-```
-
-Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
-
-You can also use the `shinyApp` function to define an application inline rather then in an external directory.
-
-In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
 
 
 

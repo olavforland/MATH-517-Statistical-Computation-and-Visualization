@@ -1,6 +1,7 @@
 #Plotting a map of Chicago
 
-pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, lubridate)
+pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, 
+              lubridate, boot, broom)
 
 
 #Register API key to google
@@ -13,7 +14,7 @@ taxi_trips<-read_csv("./data/taxi_trips_2020.csv") %>%
 
 #Extracting a random sample so plotting is done more quickly
 sample <- taxi_trips %>%
-  sample_n(10000)
+  sample_n(100000)
 colnames(sample)
 
 trip_total_in_area <- taxi_trips %>%
@@ -184,41 +185,20 @@ chicago_leaflet %>%
 
 
 # average trip total per trip per area / (average waiting time + average trip time for each area) 
-
+# Use this for bootstrapping
 avg_hourly_rate <- dropoff_to_pickup %>%
   mutate(waiting_time = (trip_start_timestamp - trip_end_timestamp)/60) %>%
   filter(pickup_community_area == dropoff_community_area) %>%
   filter(waiting_time < 300) %>%##remove outliers which indicate end of workday
   group_by(pickup_community_area) %>%
+  summarise(avg_trip_total = mean(trip_total), 
+            avg_trip_seconds = mean(trip_seconds),
+            waiting_time = mean(waiting_time)) %>%
   print()
-
-  #summarise(avg_trip_total = mean(trip_total), 
-  #          avg_trip_seconds = mean(trip_seconds),
-  #          waiting_time = mean(waiting_time)) %>%
-  #print()
-  
-boot_func <- function(data) {
-  d <- data %>%
-    summarise(avg_trip_total = mean(trip_total), 
-              avg_trip_seconds = mean(trip_seconds),
-              waiting_time = mean(waiting_time)) %>%
-    hourly_rate = avg_trip_total / (waiting_time/60 + avg_trip_seconds/3600)
-  d
-}
-set.seed(12345)
-boot_res <- boot(
-  avg_hourly_rate,
-  y = "hourly_rate", 
-  R = 500,
-  statistic = boot_func()
-)
-
-colnames(avg_hourly_rate)
 
 
 avg_hourly_rate <- avg_hourly_rate %>%
   mutate(hourly_rate = avg_trip_total / (waiting_time/60 + avg_trip_seconds/3600)) %>%
-  #select(taxi_id, waiting_time, pickup_community_area, avg_trip_total, avg_trip_seconds) %>%
   select(pickup_community_area, hourly_rate) %>%
   print()
   
@@ -235,11 +215,68 @@ hourly_pal <- colorBin("OrRd", domain=areas_hourly_rate$hourly_rate,
 
 #Generate html labels
 label_avg_hourly_rate <- sprintf(
-  "<strong>%s</strong><br/>Average hourly rate:<br/>$ %d",
-  areas_hourly_rate$community_name, areas_hourly_rate$hourly_rate
+  "<strong>%s</strong><br/>Average hourly rate:<br/><b>$ %.1f</b><br/><i>95&#37; CI:</i> [<b>$ %.1f</b>, <b>$ %.1f</b>]",
+  areas_hourly_rate$community_name, areas_hourly_rate$hourly_rate, 
+  areas_hourly_rate$lower_bound, areas_hourly_rate$upper_bound
 ) %>% lapply(htmltools::HTML)
 
 hourly_labels <- c('< 20 $', '20 - 25 $', '25 - 30 $', '30 - 25 $', '35 - 40 $', '> 40 $')
+
+
+
+#Bootstrap for exptected hourly rate
+load("./data/chicago_maps_workspace.RData")
+
+bootstrap_hourly_rate <- dropoff_to_pickup %>%
+  mutate(waiting_time = (trip_start_timestamp - trip_end_timestamp)/60,
+         trip_time = trip_seconds/60) %>%
+  filter(pickup_community_area == dropoff_community_area) %>%
+  filter(waiting_time < 300) %>%##remove outliers which indicate end of workday
+  ungroup() %>%
+  select(pickup_community_area, waiting_time, trip_total, trip_time) %>%
+  group_by(pickup_community_area) %>%
+  arrange(pickup_community_area) %>%
+  print()
+
+
+
+
+boot_hourly_rate <- function(data, indices) {
+  d <- data[indices,] %>% #allows boot to extract sample
+    group_by(pickup_community_area) %>%
+    summarise(avg_trip_total = mean(trip_total), 
+              avg_trip_seconds = mean(trip_time),
+              waiting_time = mean(waiting_time)) %>%
+    mutate(hourly_rate = 60*avg_trip_total / (waiting_time + avg_trip_seconds))
+  
+  d$hourly_rate
+}
+
+res <- boot(data=bootstrap_hourly_rate, statistic=boot_hourly_rate, R=100)
+
+conf_int <- tibble(
+  lower_bound = numeric(),
+  upper_bound = numeric()
+)
+
+hourly_rate_boots <- as_tibble(res$t)
+
+for (col in hourly_rate_boots) {
+  len <- length(col)
+  indices = as.integer(c(len*0.025 + 1, len*0.975 + 1))
+  vals <- c(sort(col, partial=indices[1])[indices[1]],
+            sort(col, partial=indices[2])[indices[2]])
+  conf_int <- conf_int %>% add_row(lower_bound = vals[1], upper_bound = vals[2])
+}
+
+  
+
+areas_hourly_rate <- areas_hourly_rate %>%
+  arrange(pickup_community_area) %>%
+  add_column(lower_bound = conf_int$lower_bound, upper_bound = conf_int$upper_bound) %>%
+  mutate(hourly_rate = (lower_bound + upper_bound) / 2) %>%
+  print()
+
 
 #Make the map
 chicago_leaflet %>%
