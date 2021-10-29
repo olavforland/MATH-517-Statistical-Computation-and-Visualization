@@ -1,12 +1,28 @@
 ---
-title: "chicago_map_combined"
-author: "SCV"
-date: "10/26/2021"
-output: 
-  html_document:
-    code_folding: hide
+
+title: 'Report'
+author: "SCV Group"
+date: "`r format(Sys.time(), '%a %b %d %Y')`"
+output:
+  slidy_presentation: default
+  beamer_presentation: null
+theme: Madrid
+colortheme: seahorse
+footer: Copyright (c) 2021, EPFL
+editor_options:
+  markdown:
+    wrap: 72
 runtime: shiny
 ---
+
+We have two questions to be answered:
+1. What are the popular places in Chicago for each hour based on the taxi location?
+2. Where should driver go in order to earn most income in Chicago?
+
+
+```{r}
+# load("/Users/yirencao/Documents/GitHub/SCV/code/work1.RData")
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -14,6 +30,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r loading package, echo=FALSE, warning=FALSE, include=FALSE}
 pacman::p_load(shiny, tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, ggplot2, data.table, readr, qqplotr, GGally, lubridate, raster, spData, spDataLarge, tmap, osmdata, gifski)
+
+#Register API key to google
+register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+
+
 ```
 
 ## load data
@@ -37,6 +58,7 @@ First of all, we do the basic analysis on the dataset and look at each variable.
 sample_gally <- my_sample %>% dplyr::select(trip_seconds, trip_miles, fare, tips, trip_total)
 GGally::ggpairs(sample_gally) + theme_bw(base_size = 22)
 ```
+
 
 To further visualise the variable trip_total which is of our main interest, we use a geom_histogram in ggplot2 and carefully select the binwidth.
 
@@ -77,6 +99,23 @@ pickup_zone %>%
 
 Further, we prefer using median over mean because the distribution of revenue is skewed.
 
+
+```{r, fig.width=10, fig.height=8}
+top5 <- pickup_zone %>%
+  group_by(pickup_community_area) %>% 
+  summarise(trip_total = sum(trip_total)) %>%
+  arrange(desc(trip_total)) %>%
+  top_n(5)
+
+sample_gally <- my_sample %>% dplyr::select(trip_miles, trip_total, pickup_community_area) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>% filter(pickup_community_area %in% top5$pickup_community_area) %>% filter(trip_total <= 200)
+
+sample_gally %>% group_by(pickup_community_area) %>% count()
+                                                                              
+GGally::ggpairs(sample_gally,  mapping = aes(col = pickup_community_area), cardinality_threshold=NULL) + theme_bw(base_size = 22)
+```
+
+
 As for the dropoff area, it is obvious that zone 76 produced most revenue. 
 ```{r x2, warning=FALSE}
 dropoff_zone <- zone_rev %>% 
@@ -104,20 +143,22 @@ After looking at the revenue map, we wonder why some of places generate more rev
 
 ## Total Revenue
 ```{r x3, warning=FALSE}
-trip_total_in_area <- taxi_trips %>%
+
+trip_total_in_area <- mytable %>%
   dplyr::select(pickup_community_area, trip_total) %>%
-  mutate(pickup_community_area = as.factor(pickup_community_area),
-         trip_total = (as.numeric(pickup_community_area))) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>%
   group_by(pickup_community_area) %>%
-  summarise(trip_total = sum(trip_total)) 
+  drop_na() %>%
+  summarise(trip_total = sum(trip_total)) # error???
+
 
 #Get location of chicago
 chicago <- geocode("Chicago, IL")
 
-#Make leaflet map with chicago center
-chicago_leaflet <- leaflet() %>% 
+
+chicago_leaflet <- leaflet() %>%
   setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
-  addProviderTiles(providers$CartoDB.Positron) 
+  addProviderTiles(providers$CartoDB.Positron)
 
 
 #Save chicago areas to use for plotting
@@ -157,7 +198,7 @@ chicago_leaflet %>%
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "15px",
                 direction = "auto")) %>%
-  
+
   addLegend("bottomright",
             pal = pal,
             values = log10(areas$trip_total),
@@ -175,6 +216,12 @@ We think population might be one of the main factors that affects the total aven
 
 We apply logarithmic function on population to make the map more sensible. After comparing the two maps, we think the population might be one of the exploratory variables to the total revenue.
 
+
+```{r}
+# comm_area %>% 
+#   dplyr::select(No., Population, `Area(km2)`, `Density(km2)`) %>% 
+#   dplyr::rename(pickup_community_area = No. )
+```
 ```{r x4, warning=FALSE}
 comm_area = read_csv("/Users/yirencao/Documents/GitHub/SCV/code/data/mywiki.csv")
 comm_area_1 = comm_area %>% 
@@ -217,6 +264,11 @@ chicago_leaflet <- leaflet() %>%
   setView(lng=chicago$lon, lat=chicago$lat, zoom=10) %>%
   addProviderTiles(providers$CartoDB.Positron) 
 
+```
+
+
+```{r xx1, warning=FALSE}
+
 #Make the map
 chicago_leaflet %>%
   addPolygons(data=areas,
@@ -243,6 +295,62 @@ chicago_leaflet %>%
             labFormat = leaflet::labelFormat(
               transform = function(x) round(2^(x))))
 
+```
+
+
+## PCA
+```{r}
+income <- read_csv("data/Per_Capita_Income.csv") %>%
+  clean_names() %>%
+  dplyr::rename(pickup_community_area = community_area_number) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) 
+
+comm_area_joined = comm_area %>% 
+  dplyr::select(No., `Area(km2)`, `Density(km2)`) %>% 
+  dplyr::rename(pickup_community_area = No. , area = `Area(km2)`, density = `Density(km2)`) %>%
+  mutate(pickup_community_area = as.numeric(pickup_community_area)) %>%
+  mutate(pickup_community_area = as.factor(pickup_community_area)) %>%
+  inner_join(areas, by="pickup_community_area") %>%
+  inner_join(trip_total_in_area, by = "pickup_community_area") %>%
+  inner_join(income, by = "pickup_community_area") %>%
+  as.data.frame() 
+
+rownames(comm_area_joined) <- comm_area_joined$community_name
+df1 <- comm_area_joined %>% dplyr::select(trip_total, area, density, Population, per_capita_income,
+                                percent_households_below_poverty, percent_aged_under_18_or_over_64)
+
+
+
+pca_arrests = princomp(df1)
+# install.packages("remotes")
+# remotes::install_github("vqv/ggbiplot")
+# library(ggbiplot)
+p1 = ggscreeplot(pca_arrests) +
+  theme_bw(base_size = 20) + labs(y = "Prop. of explained variance")
+p2 = ggscreeplot(pca_arrests,type = "cev") + theme_bw(base_size = 20) + labs(y = " Cumulative prop. of explained variance")
+gridExtra::grid.arrange(p1, p2, ncol=2)
+
+ggbiplot(pca_arrests, labels =  rownames(df1), labels.size = 3, varname.size = 5) +
+  theme_bw(base_size = 20) + coord_cartesian(ylim = c(-2.5,2.5), xlim = c(-2.5,2.5))
+
+```
+
+```{r}
+set.seed(1)
+cl_arrests = kmeans(df1, centers = 4, nstart = 10)
+p = ggbiplot(
+  pca_arrests,
+  groups = factor(cl_arrests$cluster),
+  ellipse = TRUE) + 
+  theme_bw(base_size = 20) +
+  theme(legend.position = "none")
+p
+```
+
+
+```{r}
+library(factoextra)
+fviz_cluster(cl_arrests, data = df1) + theme_classic(base_size = 26)
 ```
 
 
@@ -294,6 +402,13 @@ a1 <- st_read("/Users/yirencao/Documents/GitHub/SCV/code/data/chicago_community_
          community_name = community) 
 
 a1_3857 <- sf::st_transform(a1, 3857)
+
+
+```
+
+
+```{r xx2, warning=FALSE}
+
 ggplot() +
   geom_sf(data = a1) +
   geom_sf(data = a1_3857, colour = "blue", fill = NA, alpha = .3) +
@@ -325,8 +440,7 @@ The only exception is O’Hare, where not many amenities are gathered but a hot 
 
 
 ```{r Register, loading data, and extracting a random sample, echo=FALSE, warning=FALSE, include=FALSE}
-#Register API key to google
-register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
+
 
 
 taxi_trips <- na.omit(taxi_trips,cols=c("trip_minutes","trip_miles","trip_total"))
@@ -598,11 +712,20 @@ shinyApp(ui = ui, server = server)
 ```
 
 
+
+
+```{r}
+
+```
+
+
 ## Final Result
+
 ```{r}
 #Preparing relevant dataset 
 # pickup_dropoff_times <- taxi_trips %>%
-#   dplyr::select(taxi_id, trip_end_timestamp, trip_start_timestamp, 
+#   dplyr::select(taxi_id, trip_end_timestamp, trip_start_timestamp,
+
 #          pickup_community_area, dropoff_community_area,
 #          trip_total, trip_seconds) %>% #for in hourly_rate estimator
 #   mutate(trip_end_timestamp = as.double(mdy_hms(trip_end_timestamp)),
@@ -691,6 +814,7 @@ shinyApp(ui = ui, server = server)
 #             opacity = 0.8)
 
 ```
+
 
 
 
