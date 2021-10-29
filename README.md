@@ -1,5 +1,3 @@
-For our report: https://yirencao.github.io
-
 version https://git-lfs.github.com/spec/v1
-oid sha256:9fcc3ce70abb6841c43884c62964aaec7b306479f36c0e7bcb067d94c288c3a9
-size 2060
+oid sha256:bf25566701fa55969a38d8d6ffe98809f6fcb1d387c8570443420e4b32cab2ed
+size 173
