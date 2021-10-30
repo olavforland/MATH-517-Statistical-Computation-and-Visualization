@@ -1,0 +1,511 @@
+---
+title: "Project_Taxis"
+author: "Daryna"
+date: "10/25/2021"
+output: html_document
+  
+
+---
+
+# Introduction
+
+## Statement of the goal
+In this report we analyze the Taxi Trips in Chicage 2020 dataset. The aim of the project is to define what variables may influence the revenue of the taxi cabs. We are specifically interested to understand how the cost of trip varies depending on the community area and which areas generate the highest revenue. We then study how the cost of the trip changes through the time variable. 
+
+## Brief summary of the approach
+We first present an exploratory data analysis which allows to familiarize with the data: study the distribution of continous variables, the proportion of categories in categorical variables and the relation between those. We present first the descriptive statistics with respect to the community areas and then with respect to the taxi companies. We then present an interactive maps of Chicago which present which areas depending on the day and time are more or less profitable. 
+
+## Introduction to the problem
+This analysis of similar datasets has been performed before but mostly whith respect to the duration of the trip. We think our analysis may be relevant for taxi companies to facilitate the task of assignment of taxi cabs around the city of Chicago. 
+
+
+# Exploratory Data Analysis 
+```{r}
+# Let's first load the packages we will use further in the analysis
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(ggrepel)
+library(tidyverse)
+library(psych)
+library(qqplotr)
+require(scales)
+```
+
+
+```{r}
+# Load the data
+data = read.csv("Taxi_Trips_-_2020.csv")
+```
+
+
+
+```{r}
+# We will work on a random subset of the dataset as the data is very large and the computations take too much time
+data_sample = data[sample(nrow(data), 10000), ]
+```
+
+
+### Basic information about the variables
+
+```{r}
+# Basic Statistics
+describe(data_sample)
+str(data_sample) # Allows to see whether the variable is continuous or categorical
+typeof(data_sample)
+df = as.data.frame(data_sample) # We want to transform data into a dataframe format
+```
+
+## Continuous variables Fare and Trip.Total
+
+
+```{r dev = "png"}
+ggplot(data = data_sample, aes(x = Trip.Total)) +  geom_histogram(aes(y=..density..),bins=90, color = 'turquoise4') + 
+  geom_density(col="red") + scale_x_continuous(breaks = round(seq(min(data_sample$Trip.Total), max(data_sample$Trip.Total), by = 100),5)) + labs(title = "Distribution of the Total Cost of the Trip") + theme_classic()
+```
+
+
+Let's create logarithms for the continuous variable 
+```{r}
+data_sample <- data_sample %>% 
+  mutate(log.Trip.Total = log(Trip.Total))
+```
+
+
+```{r dev = "png"}
+ggplot(data=data_sample , aes(log.Trip.Total)) + geom_histogram(aes(y=..density..),bins=90, color = 'turquoise4') + geom_density(col="red") + scale_x_log10()+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+              labels = trans_format("log10", math_format(10^.x))) +  labs(title = "Distribution of the Total Cost of the Trip in logarithm") + theme_classic()
+```
+
+The distribution of Trip.Total seems to follow a power law sitribution. A lot of data are concentrated between 0 and 100. Some values are very extreme. We should consider to take the logarithm of Trip.Total to visualize the distribution in terms of the percentage.
+
+
+# Boxplot 
+```{r dev = "png"}
+ggplot(data_sample, aes(Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + geom_boxplot(fill = "white", colour = "turquoise4") + coord_flip() + theme(axis.text.x = element_text(angle=65, vjust=0.6)) +  labs(title = "Distribution of the Total Cost of the Trip") + theme_classic()
+```
+
+```{r dev = "png"}
+ggplot(data_sample, aes(log.Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + geom_boxplot(fill = "white", colour = "turquoise4") + coord_flip() +  theme_classic() + labs(title = "Distribution of the Total Cost of the Trip in logarithm")
+```
+
+
+## Categorical Variables 
+```{r}
+data_sample$Pickup.Community.Area <- as.factor(data_sample$Pickup.Community.Area)
+levels(data_sample$Pickup.Community.Area) <- c("Rogers Park", "West Ridge", "Uptown", "Lincoln Square", "North Center", 
+                                               "Lake View", "Lincoln Park", "Near North Side", "Edison Park", "Norwood Park",
+                                               "Jefferson Park", "Forest Glen", "North Park", "Albany Park", "Portage Park", 
+                                               "Irving Park", "Dunning", "Montclare", "Belmont Cragin", "Hermosa", 
+                                               "Avondale", "Logan Square", "Humboldt Park", "West Town", "Austin",
+                                               "West Garfield Park", "East Garfield Park", "Near West Side", "North Lawndale", "South Lawndale",
+                                               "Lower West Side", "(The)  Loop[11]", "Near South Side", "Armour Square","Douglas",
+                                               "Oakland", "Fuller Park", "Grand Boulevard", "Kenwood", "Washington Park",
+                                               "Hyde Park", "Woodlawn", "South Shore","Chatham", "Avalon Park",
+                                               "South Chicago", "Burnside", "Calumet Heights" ,"Roseland", "Pullman",
+                                               "South Deering", "East Side", "West Pullman", "Riverdale", "Hegewisch",
+                                               "Garfield Ridge", "Archer Heights", "Brighton Park", "McKinley Park", "Bridgeport",
+                                               "New City","West Elsdon","Gage Park", "Clearing", "West Lawn",
+                                               "Chicago Lawn", "West Englewood", "Englewood", "Greater Grand Crossing", "Ashburn",
+                                               "Auburn Gresham","Beverly","Washington Heights", "Mount Greenwood", "Morgan Park",
+                                               "O'Hare","Edgewater") 
+```
+
+```{r}
+data_sample$Dropoff.Community.Area <- as.factor(data_sample$Dropoff.Community.Area)
+levels(data_sample$Dropoff.Community.Area) <- c("Rogers Park", "West Ridge", "Uptown", "Lincoln Square", "North Center", 
+                                               "Lake View", "Lincoln Park", "Near North Side", "Edison Park", "Norwood Park",
+                                               "Jefferson Park", "Forest Glen", "North Park", "Albany Park", "Portage Park", 
+                                               "Irving Park", "Dunning", "Montclare", "Belmont Cragin", "Hermosa", 
+                                               "Avondale", "Logan Square", "Humboldt Park", "West Town", "Austin",
+                                               "West Garfield Park", "East Garfield Park", "Near West Side", "North Lawndale", "South Lawndale",
+                                               "Lower West Side", "(The)  Loop[11]", "Near South Side", "Armour Square","Douglas",
+                                               "Oakland", "Fuller Park", "Grand Boulevard", "Kenwood", "Washington Park",
+                                               "Hyde Park", "Woodlawn", "South Shore","Chatham", "Avalon Park",
+                                               "South Chicago", "Burnside", "Calumet Heights" ,"Roseland", "Pullman",
+                                               "South Deering", "East Side", "West Pullman", "Riverdale", "Hegewisch",
+                                               "Garfield Ridge", "Archer Heights", "Brighton Park", "McKinley Park", "Bridgeport",
+                                               "New City","West Elsdon","Gage Park", "Clearing", "West Lawn",
+                                               "Chicago Lawn", "West Englewood", "Englewood", "Greater Grand Crossing", "Ashburn",
+                                               "Auburn Gresham","Beverly","Washington Heights", "Mount Greenwood", "Morgan Park",
+                                               "O'Hare","Edgewater") 
+```
+
+# Pickup
+Let's explore now the most pick up community areas in which the taxis are found most often
+```{r}
+pickup_areas_ordered <- table(data_sample$Pickup.Community.Area) # frequency of areas
+pickup_areas_ordered <- as.data.frame(pickup_areas_ordered) # to dataframe
+pickup_areas_ordered <- pickup_areas_ordered[order(pickup_areas_ordered$Freq, decreasing = TRUE),] # frequencies in descending odrder
+```
+
+
+```{r}
+top_pickup <- pickup_areas_ordered[1:10,] # select 10 most common areas
+bottom_pickup <- pickup_areas_ordered[11:77,] # select the rest of least common areas
+sum_bottom = sum(as.numeric(bottom_pickup$Freq), na.rm = TRUE) # sum up the frequencies of the least common areas
+top_pickup <- top_pickup %>% add_row(Var1 = "Other", Freq = sum_bottom) # add the sum bottom to top_pickup
+top_pickup$Freq <- as.numeric(top_pickup$Freq)
+# Getting proportions of the frequencies
+top_pickup <- top_pickup %>% 
+  mutate(Proportion = Freq/sum(Freq))
+# rename Var 1 into Pickup Area
+top_pickup %>% 
+  rename(
+    Pickup.Community.Area = Var1
+    )
+```
+
+```{r}
+# Modify order of levels 
+top_pickup123 <- top_pickup                                                 # Replicate original data
+top_pickup123$Var1 <- factor(top_pickup123$Var1,                                    # Change ordering manually
+                  levels = c("Near North Side", "(The)  Loop[11]", "Near West Side", "O'Hare", "Lake View", "Lincoln Park",
+                             "Near South Side", "Uptown", "Garfield Ridge", "Edgewater", "Other"))
+# rename Var 1 into Pickup Area
+top_pickup123 <- top_pickup123 %>% 
+  rename(
+    Pickup.Community.Area = Var1
+    )
+```
+
+
+# Visualisation of Categorical Variables
+```{r dev = "png"}
+ggplot(top_pickup123, aes(x=Pickup.Community.Area, y=Freq, color=Pickup.Community.Area)) +
+  geom_bar(stat="identity", fill="white") + xlab("Frequency") + ylab("Pick Up Area") + ggtitle("Frequency of Pickup Areas") + theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1))  + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) 
+```
+
+
+# DropOff
+
+Let's explore now the most dropoff community areas in which the taxis are found most often
+```{r}
+dropoff_areas_ordered <- table(data_sample$Dropoff.Community.Area) # frequency of areas
+dropoff_areas_ordered <- as.data.frame(dropoff_areas_ordered) # to dataframe
+dropoff_areas_ordered <- dropoff_areas_ordered[order(dropoff_areas_ordered$Freq, decreasing = TRUE),] # frequencies in descending odrder
+```
+
+
+```{r}
+top_dropoff <- dropoff_areas_ordered[1:10,] # select 10 most common areas
+bottom_dropoff <- dropoff_areas_ordered[11:77,] # select the rest of least common areas
+sum_bottom_drop = sum(as.numeric(bottom_dropoff$Freq), na.rm = TRUE) # sum up the frequencies of the least common areas
+top_dropoff <- top_dropoff %>% add_row(Var1 = "Other", Freq = sum_bottom_drop) # add the sum bottom to top_pickup
+top_dropoff$Freq <- as.numeric(top_dropoff$Freq)
+
+# Getting proportions of the frequencies
+top_dropoff <- top_dropoff %>% 
+  mutate(Proportion = Freq/sum(Freq))
+# rename Var 1 into Pickup Area
+top_dropoff <- top_dropoff %>% 
+  rename(
+    Dropoff.Community.Area = Var1
+    )
+```
+
+
+```{r}
+# Modify order of levels 
+top_dropoff123 <- top_dropoff                                                
+top_dropoff123$Dropoff.Community.Area <- factor(top_dropoff123$Dropoff.Community.Area,                                    
+                  levels = c("Near North Side", "(The)  Loop[11]", "Near West Side", "Lake View","Lincoln Park", "West Town", "Near South Side", "Morgan Park", "Uptown", "O'Hare", "Other"))
+# rename Var 1 into Pickup Area
+
+```
+
+```{r dev = "png"}
+ggplot(top_dropoff123, aes(x=Dropoff.Community.Area, y=Freq, color=Dropoff.Community.Area)) +
+  geom_bar(stat="identity", fill="white") + xlab("Frequency") + ylab("Dropoff Area") + ggtitle("Frequency of Dropoff Areas") + theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1))  + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) 
+```
+
+
+## Pie charts 
+
+```{r}
+top_pickup_pc <- top_pickup[order(top_pickup$Freq),] 
+top_pickup_pc <- top_pickup_pc[-c(9), ]
+top_pickup_pc <- top_pickup_pc %>% add_row(Var1 = "Other", Freq = 1516, Proportion = 0.16362655	)
+top_pickup_pc <- top_pickup_pc[c(11,1:nrow(top_pickup_pc)), ]
+top_pickup_pc <- top_pickup_pc[-c(12), ]
+top_pickup_pc
+```
+
+
+```{r dev = "png"}
+ggplot(top_pickup_pc, aes(x = "" , y = Freq, fill = fct_inorder(Var1))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Set3") +
+  #geom_label_repel(data = top_pickup2,
+                 #  aes(y = pos, label = paste0(Freq, "%")),
+                 #  size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Pick Up Area")) +
+  theme_void()+  ggtitle("Frequency of Pickup Areas")
+```
+
+
+# Pie Chart for Dropoff
+
+
+```{r}
+top_dropof_pc <- top_dropoff[order(top_dropoff$Freq),] 
+top_dropof_pc <- top_dropof_pc[-c(10), ] # Other	1850	0.20489534	
+top_dropof_pc <- top_dropof_pc %>% add_row(Dropoff.Community.Area = "Other", Freq = 1850, Proportion = 0.20489534	)
+top_dropof_pc <- top_dropof_pc[c(11,1:nrow(top_dropof_pc)), ]
+top_dropof_pc <- top_dropof_pc[-c(12), ]
+top_dropof_pc
+```
+
+
+```{r dev = "png"}
+ggplot(top_dropof_pc, aes(x = "" , y = Freq, fill = fct_inorder(Dropoff.Community.Area))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Set3") +
+  #geom_label_repel(data = top_pickup2,
+                 #  aes(y = pos, label = paste0(Freq, "%")),
+                 #  size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Dropoff Area")) +
+  theme_void()+  ggtitle("Frequency of Dropoff Areas")
+```
+
+## Distribution by common areas 
+
+## Boxplots representing Trip Total of the most common Areas
+```{r}
+# First take subset of the most common Areas
+sample_common_areas <- subset(data_sample, Pickup.Community.Area == "Edgewater" | Pickup.Community.Area == "Garfield Ridge" | Pickup.Community.Area == "Uptown" | Pickup.Community.Area == "Near South Side" | Pickup.Community.Area == "Lincoln Park" | Pickup.Community.Area == "Lake View" | Pickup.Community.Area == "O'Hare" | Pickup.Community.Area == "(The)  Loop[11]" | Pickup.Community.Area == "Near North Side" | Pickup.Community.Area ==  "Near West Side")
+sample_common_areas[,"Pickup.Community.Area"] <- as.factor(sample_common_areas[,"Pickup.Community.Area"])
+```
+
+```{r dev = "png"}
+ggplot(sample_common_areas, aes(Pickup.Community.Area, log.Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) + scale_y_log10() + ggtitle("Distribution of the Total Cost of The Trip (in logarithm) by Pickup Area")
+```
+We can see that for areas 56 and 76, it seems like the revenue is higher 
+
+```{r dev = "png"}
+ggplot(sample_common_areas, aes(Pickup.Community.Area, Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) + ggtitle("Distribution of the Total Cost of The Trip by Pickup Area")
+# There are some crazy outliers
+```
+
+
+```{r}
+# Let's try to delete very extreme values
+# which.max(sample_common_areas$log.Trip.Total) # 5155
+# sample_common_areas_wo <- sample_common_areas[-c(5155, 1653), ] 
+
+# ggplot(sample_common_areas_wo, aes(Pickup.Community.Area, Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5))
+```
+Even we delete the 2 highest outliers the distributions is very skewed, it's better to continue on the log scale
+
+
+### Distribution of Dropoff Areas 
+
+
+## Boxplots representing Trip Total of the most common Areas
+```{r}
+# First take subset of the most common Areas
+sample_common_areas_dropoff <- subset(data_sample, Dropoff.Community.Area == "O'Hare" | Dropoff.Community.Area == "Uptown" | Dropoff.Community.Area == "Morgan Park" | Dropoff.Community.Area == "Near South Side" | Dropoff.Community.Area == "West Town" | Dropoff.Community.Area == "Lincoln Park" | Dropoff.Community.Area == "Lake View" | Dropoff.Community.Area == "Near West Side" | Dropoff.Community.Area == "(The)  Loop[11]" | Dropoff.Community.Area ==  "Near North Side")
+sample_common_areas_dropoff[,"Dropoff.Community.Area"] <- as.factor(sample_common_areas_dropoff[,"Dropoff.Community.Area"])
+```
+
+```{r dev = "png"}
+ggplot(sample_common_areas_dropoff, aes(Dropoff.Community.Area, log.Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) + scale_y_log10() + ggtitle("Distribution of the Total Cost of The Trip (in logarithm) by Dropoff Area")
+```
+
+
+
+```{r dev = "png"}
+ggplot(sample_common_areas_dropoff, aes(Dropoff.Community.Area, Trip.Total)) + geom_boxplot() + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + theme_classic()+ theme(axis.text.x = element_text(angle=45, vjust=0.5)) + ggtitle("Distribution of the Total Cost of The Trip by Dropoff Area")
+# There are some crazy outliers
+```
+
+### Histograms 
+
+```{r dev = "png"}
+ggplot(sample_common_areas, aes(x=log.Trip.Total, fill=Pickup.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity', bins = 50) + scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+              labels = trans_format("log10", math_format(10^.x))) + theme_classic() + ggtitle("Distribution of the Total Cost of The Trip (in logarithm) by Pickup Area")
+```
+# Looks like we have a bimodal distribution
+
+
+```{r dev = "png"}
+ggplot(sample_common_areas, aes(x=Trip.Total, fill=Pickup.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity', bins = 50) + theme_classic() + ggtitle("Distribution of the Total Cost of The Trip by Pickup Area")
+```
+
+# Hist for Dropoffs
+```{r dev = "png"}
+ggplot(sample_common_areas_dropoff, aes(x=log.Trip.Total, fill=Dropoff.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity', bins = 50) + scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+              labels = trans_format("log10", math_format(10^.x))) + theme_classic() + ggtitle("Distribution of the Total Cost of The Trip (in logarithm) by Dropoff Area")
+```
+
+```{r dev = "png"}
+ggplot(sample_common_areas_dropoff, aes(x=Trip.Total, fill=Dropoff.Community.Area)) +
+  geom_histogram( color='#e9ecef', alpha=0.6, position='identity', bins = 50) + theme_classic() + ggtitle("Distribution of the Total Cost of The Trip by Dropoff Area")
+```
+
+
+
+
+
+## Realtion between continious variables 
+```{r dev = "png"}
+ggplot(data=data_sample,aes(x=Trip.Total,y=Trip.Seconds)) +
+theme_classic() +
+theme(text = element_text(size=5),legend.position = c(0.2, 0.8),legend.key.size = unit(0.2, 'cm')) + xlab("Trip Total") +
+ylab("Trip Seconds")  + geom_point()
+```
+
+
+### QQ_Plots
+# When plotting theoretical quantiles to empirical quantiles we see that in fact neither Trip Total neither log of trip Total follows normal distribution overall. hen we separate in themost common areas, looks a bit better
+```{r dev = "png"}
+ggplot(data_sample, aes(sample = Trip.Total)) +  stat_qq_band() + stat_qq_line() + stat_qq_point() + labs(x="Theoretical Quantiles", y = "Sample QUantiles") + theme_bw() + theme(aspect.ratio = 1) +theme(text = element_text(size = 6))
+```
+
+```{r dev = "png"}
+ggplot(data_sample, aes(sample = log.Trip.Total )) + stat_qq_band() + stat_qq_line() + stat_qq_point() + labs(x="Theoretical Quantiles", y = "Sample Quantiles") + theme_bw() + theme(aspect.ratio = 1) +theme(text = element_text(size = 6))
+```
+
+```{r dev = "png"}
+ggplot(data = sample_common_areas, mapping = aes(sample = log.Trip.Total, color = Pickup.Community.Area, fill = Pickup.Community.Area)) +
+    stat_qq_band() +
+    stat_qq_line() +
+    stat_qq_point(size = 0.5) +
+    facet_wrap(~ Pickup.Community.Area) +
+    labs(x = "Theoretical Quantiles", y = "Sample Quantiles")  + theme_bw() + theme(text = element_text(size = 6)) + theme(aspect.ratio = 1)
+
+```
+
+
+```{r dev = "png"}
+ggplot(data = sample_common_areas, mapping = aes(sample = Trip.Total, color = Pickup.Community.Area, fill = Pickup.Community.Area)) +
+    stat_qq_band() +
+    stat_qq_line() +
+    stat_qq_point(size = 0.5) +
+    facet_wrap(~ Pickup.Community.Area) +
+    labs(x = "Theoretical Quantiles", y = "Sample Quantiles")  + theme_bw() + theme(text = element_text(size = 6)) + theme(aspect.ratio = 1)
+
+```
+
+### Time series
+
+```{r}
+data_sample$Trip.Start.Timestamp <- as.character(data_sample$Trip.Start.Timestamp)
+```
+
+
+
+```{r}
+data_sample$days <-as.Date.character(data_sample$Trip.Start.Timestamp, format = "%m/%d/%Y")
+```
+
+
+```{r}
+data_sample$month <- month(data_sample$days)
+data_sample$month <- as.factor(data_sample$month)
+levels(data_sample$month) <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+```
+
+```{r}
+data_sample$month <- factor(data_sample$month, levels= c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered=TRUE)
+```
+
+
+### Same for the subsample
+```{r}
+sample_common_areas$days <-as.Date.character(sample_common_areas$Trip.Start.Timestamp, format = "%m/%d/%Y")
+sample_common_areas$month <- month(sample_common_areas$days)
+sample_common_areas$month <- as.factor(sample_common_areas$month)
+levels(sample_common_areas$month) <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+sample_common_areas$month <- factor(sample_common_areas$month, levels= c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered=TRUE)
+```
+
+
+
+```{r dev = "png"}
+ggplot(data=sample_common_areas, aes(x=month, y=log.Trip.Total, group=Pickup.Community.Area, color=Pickup.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by month and by pickup area in logarithm")
+```
+
+```{r dev = "png"}
+ggplot(data=sample_common_areas, aes(x=month, y=Trip.Total, group=Pickup.Community.Area, color=Pickup.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by month and by pickup area")
+```
+
+## For week days 
+```{r}
+sample_common_areas$weekday <- weekdays(sample_common_areas$days)
+sample_common_areas$weekday <- as.factor(sample_common_areas$weekday)
+sample_common_areas$weekday <- ordered(sample_common_areas$weekday, levels = c("Monday", "Tuesday", "Wednesday","Thursday","Friday", "Saturday", "Sunday"))
+```
+
+```{r}
+ggplot(data=sample_common_areas, aes(x=weekday, y=log.Trip.Total, group=Pickup.Community.Area, color=Pickup.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by weekday and by pickup area in logarithm")
+```
+
+```{r}
+ggplot(data=sample_common_areas, aes(x=weekday, y=Trip.Total, group=Pickup.Community.Area, color=Pickup.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by weekday and by pickup area")
+```
+
+## For dropoff
+## Month
+```{r}
+sample_common_areas_dropoff$days <-as.Date.character(sample_common_areas_dropoff$Trip.Start.Timestamp, format = "%m/%d/%Y")
+sample_common_areas_dropoff$month <- month(sample_common_areas_dropoff$days)
+sample_common_areas_dropoff$month <- as.factor(sample_common_areas_dropoff$month)
+levels(sample_common_areas_dropoff$month) <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+sample_common_areas_dropoff$month <- factor(sample_common_areas_dropoff$month, levels= c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered=TRUE)
+```
+
+
+
+```{r dev = "png"}
+ggplot(data=sample_common_areas_dropoff, aes(x=month, y=log.Trip.Total, group=Dropoff.Community.Area, color=Dropoff.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by month and by dropoff area in logarithm")
+```
+
+
+
+```{r dev = "png"}
+ggplot(data=sample_common_areas_dropoff, aes(x=month, y=Trip.Total, group=Dropoff.Community.Area, color=Dropoff.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by month and by dropoff area")
+```
+
+
+## For week days 
+```{r}
+sample_common_areas_dropoff$weekday <- weekdays(sample_common_areas_dropoff$days)
+sample_common_areas_dropoff$weekday <- as.factor(sample_common_areas_dropoff$weekday)
+sample_common_areas_dropoff$weekday <- ordered(sample_common_areas_dropoff$weekday, levels = c("Monday", "Tuesday", "Wednesday","Thursday","Friday", "Saturday", "Sunday"))
+```
+
+
+```{r}
+ggplot(data=sample_common_areas_dropoff, aes(x=weekday, y=log.Trip.Total, group=Dropoff.Community.Area, color=Dropoff.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by weekday and by dropoff area in logarithm")
+```
+
+
+```{r}
+ggplot(data=sample_common_areas_dropoff, aes(x=weekday, y=Trip.Total, group=Dropoff.Community.Area, color=Dropoff.Community.Area))+ 
+  geom_line(stat='summary', fun.y='mean') + 
+  geom_point(stat='summary', fun.y='mean') + theme_bw() + ggtitle("Total Cost of Trip by weekday and by dropoff area")
+```
+
+
