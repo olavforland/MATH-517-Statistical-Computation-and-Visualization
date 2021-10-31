@@ -41,7 +41,7 @@ Since the revenue differences between areas often vary by several orders of magn
 #### Total Revenue by Area
 ```{r Plot trip total map, echo=TRUE}
 #Make the map
-chicago_leaflet %>%
+olav1<- chicago_leaflet %>%
   addPolygons(data=areas_trip_total,
               fillColor=~revenue_pal(log10(areas_trip_total$trip_total)),
               color="lightgrey",
@@ -64,7 +64,8 @@ chicago_leaflet %>%
             title = "Trip total (in USD)",
             opacity = 0.8,
             labFormat = leaflet::labelFormat(
-              transform = function(x) 10^(x)))
+              transform = function(x) 10^(x))) %>%
+  leaflet.extras::addResetMapButton()
 ```
 
 
@@ -79,7 +80,7 @@ We extract `taxi_id`, `trip_start_timestamp`, `trip_end_timestamp`, `pickup_comm
 #### Average waiting time by area
 ```{r Plot waiting time map, include=TRUE, warning=FALSE, echo=TRUE}
 
-chicago_leaflet %>%
+olav2<-chicago_leaflet %>%
   addPolygons(data=areas_pickup_time,
               fillColor=~time_pal(areas_pickup_time$avg_pickup_time),
               color="lightgrey",
@@ -103,7 +104,8 @@ chicago_leaflet %>%
             },
             values = areas_pickup_time$avg_pickup_time,
             title = "Average time between pickup and dropoff",
-            opacity = 0.8)
+            opacity = 0.8)%>%
+  leaflet.extras::addResetMapButton()
 
 ```
 
@@ -132,7 +134,7 @@ To obtain the expected revenue per hour for each area, we simply calculate the a
 ```{r Plot hourly salary, include=TRUE, warning=FALSE, echo=TRUE}
 
 
-chicago_leaflet %>%
+olav3<-chicago_leaflet %>%
   addPolygons(data=areas_hourly_rate,
               fillColor=~hourly_pal(areas_hourly_rate$hourly_rate),
               color="lightgrey",
@@ -156,7 +158,8 @@ chicago_leaflet %>%
             },
             values = areas_hourly_rate$hourly_rate,
             title = "Average hourly rate",
-            opacity = 0.8)
+            opacity = 0.8)%>%
+  leaflet.extras::addResetMapButton()
 
 ```
 <em>95% confidence interval is shown when hovering over an area</em>
