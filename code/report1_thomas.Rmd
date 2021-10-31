@@ -1,5 +1,5 @@
 ---
-title: "Basic exploration of area for each time of the day"
+title: "Basic exploration of areas for each time of the day"
 author: "Thomas"
 date: "10/19/2021"
 output: html_document
@@ -11,10 +11,19 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r loading package, echo=FALSE, warning=FALSE, include=FALSE}
-pacman::p_load(tidyverse, pacman, ggmap, janitor, sf, mapview, leaflet, rgdal, RColorBrewer, shiny)
+library(shiny)
+library(tidyverse)
+library(ggmap)
+library(janitor)
+library(sf)
+library(mapview)
+library(leaflet)
+library(rgdal)
+library(RColorBrewer)
+load("taxi_thomas.RData")
 ```
 
-```{r Register API key to google, echo=FALSE, warning=FALSE, include = FALSE}
+```{r Register API key to google, echo=FALSE, warning=FALSE, include = FALSE, eval=FALSE}
 #Register API key to google
 register_google(key="AIzaSyBT6yzDKV_DGcFGK9E-cXu0zNUD4WTJOZA")
 taxi_trips<-read_csv("Taxi_Trips_-_2020.csv") %>%
